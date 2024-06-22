@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Books</title>
+</head>
+<body>
+    <h1>Search Results</h1>
+    <% if (data.docs && data.docs.length > 0) { %>
+        <ul>
+        <% data.docs.forEach(book => { %>
+            <li><strong><%= book.title %></strong> by <%= book.author_name ? book.author_name.join(', ') : 'Unknown author' %></li>
+        <% }) %>
+        </ul>
+    <% } else { %>
+        <p>No books found.</p>
+    <% } %>
+    <a href="/">Go back</a>
+</body>
+</html>

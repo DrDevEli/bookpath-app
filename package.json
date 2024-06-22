@@ -1,0 +1,22 @@
+{
+  "name": "booksserviceapi",
+  "version": "1.0.0",
+  "description": "books search api",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "author": "DrDevEli",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.8",
+    "body-parse": "^0.1.0",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "nodemon": "^3.1.0",
+    "path": "^0.12.7"
+  }
+}
