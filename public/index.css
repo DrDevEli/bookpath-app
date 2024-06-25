@@ -19,13 +19,20 @@ body, h1{
 }
 .searchBox{
     width:400px;
-    height:100px;
+    height:50px;
     display:flex;
     align-items:center;
     justify-content:center;
-    flex-wrap:wrap;
-    padding:15px;
-    margin:10px auto;
+    margin:150px auto;
     border-radius:10px;
     background-color:white;
+  }
+  #text-input{
+    height: 30px;
+    width: 200px;
+    text-align: center;
+    font-size: 1.2rem;
+    margin: 10px;
+    border: none;
+    border-bottom: 2px solid #0a0a23;
   }
