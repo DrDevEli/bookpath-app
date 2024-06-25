@@ -57,19 +57,4 @@ app.get('/books/title', async (req, res) => {
   }
 });
 
-app.get('/books/authors', async (req, res) => {
-  try {
-      const response = await axios.get(endpoint, {
-          params: {
-              authors: req.query.title || '', // Example: search by author
-          }
-      });
-      console.log(response.data);
-      res.render('books', { data: response.data }); // Render the books.ejs file
-  } catch (error) {
-      console.error('Error fetching data from Open Library API:', error);
-      res.status(500).json({ error: 'An error occurred while fetching data.' });
-  }
-});
-
 app.listen(PORT, () => console.log(`Server is running on ${PORT}`));

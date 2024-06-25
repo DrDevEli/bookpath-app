@@ -20,6 +20,8 @@ body, h1{
 .searchBox{
     width:400px;
     height:50px;
+    position: relative;
+    bottom: 150px;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -36,3 +38,30 @@ body, h1{
     border: none;
     border-bottom: 2px solid #0a0a23;
   }
+  .resultsUl{
+    list-style: none;
+    line-height: 1.5rem;
+    font-size: 1.5rem;
+    position: relative;
+    bottom: 150px;
+    text-align: center;
+  }
+ .resultsUl li{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+ }
+ .resultsUl strong{
+  color: #DAD3BE;
+ }
+.returnLink{
+  font-size: 1.3rem;
+  text-decoration: none;
+  color:#DC5F00;
+  position: relative;
+  bottom: 50px;
+}
+.returnLink:hover{
+  color: #DAD3BE;
+}
