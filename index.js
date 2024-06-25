@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3003;
 
 const endpoint = 'https://openlibrary.org/search.json';
 app.use(bodyParser.json());
-app.use(express.static("../public/index.css"));
+app.use(express.static("public"));
 app.use(morgan('tiny'));
 
 // Get the directory name in ES module scope
