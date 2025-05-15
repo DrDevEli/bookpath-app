@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import * as openpgp from "openpgp";
+import AuditLog from "./AuditLog.js";
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -38,10 +40,6 @@ const userSchema = new mongoose.Schema({
   accountLockedUntil: Date,
   passwordResetToken: String,
   resetTokenExpires: Date,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
   gpgPublicKey: {
     type: String,
     trim: true,
@@ -69,6 +67,8 @@ const userSchema = new mongoose.Schema({
     type: String, 
     enum: ['free', 'pro'], 
     default: 'free' },
+    tokenVersion: { type: Number, default: 0 },
+
 });
 
 // Audit logging middleware
@@ -85,10 +85,12 @@ userSchema.post('save', function (doc) {
 // Hash password before saving
 userSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 23);
+    this.password = await bcrypt.hash(this.password, 12);
+    this.tokenVersion += 1; // Invalidate existing JWTs
   }
   next();
 });
+
 
 // Compare password method                                                                                                                
 userSchema.methods.comparePassword = async function (candidatePassword) {
