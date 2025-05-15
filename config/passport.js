@@ -11,8 +11,26 @@ import * as openpgp from 'openpgp';
     },
     async (email, password, done) => {
       try {
+        // Enhanced rate limiting
+        if (user?.accountLockedUntil && user.accountLockedUntil > new Date()) {
+          return done(null, false, { 
+            message: `Account locked until ${user.accountLockedUntil.toISOString()}` 
+          });
+        }
+
+        const attemptsKey = `login:${email}:${new Date().toISOString().slice(0,10)}`;
+        const attempts = await redisClient.incr(attemptsKey);
+        await redisClient.expire(attemptsKey, 86400); // 24h
+        
+        if (attempts >= 5) {
+          await User.findByIdAndUpdate(user._id, {
+            accountLockedUntil: new Date(Date.now() + 15*60*1000) // 15 min lock
+          });
+          return done(null, false, { message: 'Too many attempts. Account temporarily locked.' });
+        }
+
         // 1. Find user by email
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email }).select('+password');
 
         // 2. If user doesn't exist
         if (!user) {
@@ -32,6 +50,32 @@ import * as openpgp from 'openpgp';
       }
     }
   ));
+
+  // JWT Strategy
+  passport.use(new JwtStrategy({
+    jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+    secretOrKey: process.env.JWT_SECRET,
+    issuer: process.env.JWT_ISSUER,
+    audience: process.env.JWT_AUDIENCE,
+    passReqToCallback: true
+  }, async (req, payload, done) => {
+    try {
+      // Check token in Redis blacklist
+      const isBlacklisted = await redisClient.get(`jwt:blacklist:${payload.jti}`);
+      if (isBlacklisted) {
+        return done(null, false, { message: 'Token revoked' });
+      }
+
+      const user = await User.findById(payload.sub);
+      if (!user) {
+        return done(null, false, { message: 'User not found' });
+      }
+
+      return done(null, user);
+    } catch (error) {
+      return done(error);
+    }
+  }));
 
   // Serialize user for session
   passport.serializeUser((user, done) => {

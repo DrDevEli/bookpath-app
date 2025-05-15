@@ -6,6 +6,9 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
+  *.gpg
+   *.asc
+config/ssl/*.pem
 
 # Dependency directories
 node_modules/

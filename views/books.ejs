@@ -11,12 +11,39 @@
     <% if (data.docs && data.docs.length > 0) { %>
         <ul class="resultsUl">
         <% data.docs.forEach(book => { %>
-            <li><strong><%= book.title %></strong> by <%= book.author_name ? book.author_name.join(', ') : 'Unknown author' %></li>
+            <li class="book-item">
+                <strong><%= book.title %></strong>
+                <div class="book-meta">
+                    <% if (book.author_name) { %>
+                        <span>by <%= book.author_name.join(', ') %></span>
+                    <% } %>
+                    <% if (book.first_publish_year) { %>
+                        <span>(<%= book.first_publish_year %>)</span>
+                    <% } %>
+                </div>
+                <% if (book.cover_i) { %>
+                    <img src="https://covers.openlibrary.org/b/id/<%= book.cover_i %>-M.jpg" 
+                         alt="Cover of <%= book.title %>" 
+                         class="book-cover">
+                <% } %>
+            </li>
         <% }) %>
         </ul>
+    <% } else if (data.error) { %>
+        <div class="error">
+            <p><%= data.error %></p>
+        </div>
     <% } else { %>
-        <p>No books found.</p>
+        <p>No books found. Try another search term.</p>
     <% } %>
-    <a class="returnLink"href="/">Go back</a>
+    <% if (data.numFound > data.docs.length) { %>
+        <div class="pagination">
+            <% const totalPages = Math.ceil(data.numFound / data.docs.length) %>
+            <% for (let i = 1; i <= totalPages; i++) { %>
+                <a href="/books?q=<%= query %>&page=<%= i %>"><%= i %></a>
+            <% } %>
+        </div>
+    <% } %>
+    <a class="returnLink" href="/">← Back to search</a>
 </body>
 </html>
