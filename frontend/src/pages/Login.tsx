@@ -57,33 +57,35 @@ export function Login() {
       <Card>
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center" style={{ color: '#dbcd90' }}>
             Enter your credentials to access your account
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" style={{ color: '#dbcd90' }}>Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="name@example.com"
                 {...register('email')}
                 disabled={isSubmitting}
+                style={{ height: '32px', padding: '6px 12px', fontSize: '14px' }}
               />
               {errors.email && (
                 <p className="text-sm text-red-500">{errors.email.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" style={{ color: '#dbcd90' }}>Password</Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="Enter your password"
                 {...register('password')}
                 disabled={isSubmitting}
+                style={{ height: '32px', padding: '6px 12px', fontSize: '14px' }}
               />
               {errors.password && (
                 <p className="text-sm text-red-500">{errors.password.message}</p>
@@ -109,14 +111,14 @@ export function Login() {
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <div className="text-sm text-muted-foreground text-center">
+          <div className="text-sm text-muted-foreground text-center" style={{ color: '#dbcd90' }}>
             Don't have an account?{' '}
-            <Link to="/register" className="text-primary hover:underline font-medium">
+            <Link to="/register" className="hover:underline font-medium" style={{ color: '#dbcd90' }}>
               Create one
             </Link>
           </div>
-          <div className="text-sm text-muted-foreground text-center">
-            <Link to="/forgot-password" className="text-primary hover:underline">
+          <div className="text-sm text-muted-foreground text-center" style={{ color: '#dbcd90' }}>
+            <Link to="/forgot-password" className="hover:underline" style={{ color: '#dbcd90' }}>
               Forgot your password?
             </Link>
           </div>

@@ -60,3 +60,9 @@ openai.log
 .aider.input.history
 .aider.tags.cache.v4/
 .aider*
+
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local

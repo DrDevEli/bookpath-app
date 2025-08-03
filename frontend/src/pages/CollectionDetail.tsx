@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
+import BookCard from '@/components/BookCard';
 import api from '../api';
 
 interface Book {
@@ -142,28 +142,7 @@ export function CollectionDetail() {
     }
   };
 
-  const getReadStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'reading': return 'bg-blue-100 text-blue-800';
-      case 'abandoned': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getReadStatusText = (status: string) => {
-    switch (status) {
-      case 'completed': return 'Completed';
-      case 'reading': return 'Reading';
-      case 'abandoned': return 'Abandoned';
-      default: return 'To Read';
-    }
-  };
-
-  const getRatingStars = (rating?: number) => {
-    if (!rating) return 'No rating';
-    return '⭐'.repeat(rating) + '☆'.repeat(5 - rating);
-  };
+  // Helper functions moved to BookCard component
 
   if (loading) {
     return (
@@ -247,155 +226,99 @@ export function CollectionDetail() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {collection.books.map((book) => (
-            <Card key={book.bookId} className="overflow-hidden group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2">
-              <div className="flex">
-                {book.coverImage && (
-                  <div className="w-24 h-32 flex-shrink-0 relative overflow-hidden">
-                    <img
-                      src={book.coverImage}
-                      alt={book.title}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                  </div>
-                )}
-                <div className="flex-1 p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold group-hover:text-primary transition-colors duration-300">{book.title}</h3>
-                      <p className="text-muted-foreground group-hover:text-muted-foreground/80 transition-colors duration-300">
-                        by {book.authors.join(', ')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-1 rounded-full transition-all duration-300 ${getReadStatusColor(book.readStatus)}`}>
-                        {getReadStatusText(book.readStatus)}
-                      </span>
-                      {book.rating && (
-                        <span className="text-xs text-yellow-600 animate-pulse">
-                          {getRatingStars(book.rating)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+            <BookCard
+              key={book.bookId}
+              book={{
+                ...book,
+                id: book.bookId,
+              }}
+              showReadStatus={true}
+              showProgress={true}
+              onEdit={(bookId) => {
+                setEditingBook(bookId);
+                setValue('readStatus', book.readStatus);
+                setValue('rating', book.rating);
+                setValue('notes', book.notes);
+              }}
+              onRemove={handleRemoveBook}
+            />
+          ))}
+        </div>
+      )}
 
-                  {book.notes && (
-                    <p className="text-sm text-muted-foreground mb-3 group-hover:text-muted-foreground/80 transition-colors duration-300">
-                      "{book.notes}"
-                    </p>
-                  )}
-
-                  {book.progress !== undefined && book.progress > 0 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>Progress</span>
-                        <span>{book.progress}%</span>
-                      </div>
-                      <Progress value={book.progress} className="h-2" />
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    {editingBook === book.bookId ? (
-                      <form 
-                        onSubmit={handleSubmit((data) => handleUpdateBook(book.bookId, data))}
-                        className="flex-1 space-y-3"
-                      >
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label htmlFor="readStatus">Status</Label>
-                            <select
-                              {...register('readStatus')}
-                              defaultValue={book.readStatus}
-                              className="w-full rounded-md border border-gray-300 px-3 py-1 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
-                            >
-                              <option value="to-read">To Read</option>
-                              <option value="reading">Reading</option>
-                              <option value="completed">Completed</option>
-                              <option value="abandoned">Abandoned</option>
-                            </select>
-                          </div>
-                          <div>
-                            <Label htmlFor="rating">Rating</Label>
-                            <select
-                              {...register('rating', { valueAsNumber: true })}
-                              defaultValue={book.rating || ''}
-                              className="w-full rounded-md border border-gray-300 px-3 py-1 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
-                            >
-                              <option value="">No rating</option>
-                              <option value="1">1 star</option>
-                              <option value="2">2 stars</option>
-                              <option value="3">3 stars</option>
-                              <option value="4">4 stars</option>
-                              <option value="5">5 stars</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="notes">Notes</Label>
-                          <Input
-                            {...register('notes')}
-                            placeholder="Add your thoughts..."
-                            defaultValue={book.notes}
-                            className="focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button type="submit" size="sm" disabled={updating} className="transition-all duration-300 hover:scale-105">
-                            {updating ? (
-                              <div className="flex items-center gap-2">
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                Saving...
-                              </div>
-                            ) : (
-                              'Save'
-                            )}
-                          </Button>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              setEditingBook(null);
-                              reset();
-                            }}
-                            className="transition-all duration-300 hover:scale-105"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    ) : (
-                      <>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setEditingBook(book.bookId);
-                            setValue('readStatus', book.readStatus);
-                            setValue('rating', book.rating);
-                            setValue('notes', book.notes);
-                          }}
-                          className="transition-all duration-300 hover:scale-105"
-                        >
-                          Edit
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleRemoveBook(book.bookId)}
-                          className="transition-all duration-300 hover:scale-105 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
-                        >
-                          Remove
-                        </Button>
-                      </>
-                    )}
-                  </div>
+      {/* Edit Modal */}
+      {editingBook && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Edit Book</h3>
+            <form 
+              onSubmit={handleSubmit((data) => handleUpdateBook(editingBook, data))}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="readStatus">Status</Label>
+                  <select
+                    {...register('readStatus')}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
+                  >
+                    <option value="to-read">To Read</option>
+                    <option value="reading">Reading</option>
+                    <option value="completed">Completed</option>
+                    <option value="abandoned">Abandoned</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="rating">Rating</Label>
+                  <select
+                    {...register('rating', { valueAsNumber: true })}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
+                  >
+                    <option value="">No rating</option>
+                    <option value="1">1 star</option>
+                    <option value="2">2 stars</option>
+                    <option value="3">3 stars</option>
+                    <option value="4">4 stars</option>
+                    <option value="5">5 stars</option>
+                  </select>
                 </div>
               </div>
-            </Card>
-          ))}
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Input
+                  {...register('notes')}
+                  placeholder="Add your thoughts..."
+                  className="focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" disabled={updating} className="flex-1 transition-all duration-300 hover:scale-105">
+                  {updating ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                      Saving...
+                    </div>
+                  ) : (
+                    'Save'
+                  )}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setEditingBook(null);
+                    reset();
+                  }}
+                  className="transition-all duration-300 hover:scale-105"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

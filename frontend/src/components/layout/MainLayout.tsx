@@ -105,14 +105,25 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     )}
                   </div>
                 ) : (
-                  <>
-                    <Button variant="ghost" asChild>
-                      <Link to="/login">Login</Link>
-                    </Button>
-                    <Button asChild>
-                      <Link to="/register">Register</Link>
-                    </Button>
-                  </>
+                  <Button 
+                    variant="ghost" 
+                    asChild 
+                    style={{ 
+                      color: '#dbcd90', 
+                      border: '1.5px solid #dbcd90',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#dbcd90';
+                      e.currentTarget.style.color = '#000000';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#dbcd90';
+                    }}
+                  >
+                    <Link to="/login">Login</Link>
+                  </Button>
                 )}
               </div>
             </div>

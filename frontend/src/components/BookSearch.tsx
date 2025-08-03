@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from "@/hooks/use-toast";
 import { BookCardSkeletonGrid } from './BookCardSkeleton';
+import BookCard from './BookCard';
 import api from '../api';
 import { isAuthenticated } from '../auth';
 
@@ -233,10 +234,7 @@ export function BookSearch() {
     });
   };
 
-  const getRatingStars = (rating?: number) => {
-    if (!rating) return 'No rating';
-    return '⭐'.repeat(Math.round(rating)) + '☆'.repeat(5 - Math.round(rating));
-  };
+
 
   return (
     <div className="container mx-auto p-4 min-h-screen">
@@ -296,150 +294,99 @@ export function BookSearch() {
           <div className="text-center text-base text-text-secondary font-medium">
             Found {pagination?.totalResults || searchResults.length} results
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-          {searchResults.map((book) => (
-            <Card key={book.id} className="overflow-hidden group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 bg-surface rounded-xl shadow-md flex flex-col min-h-[260px]">
-              {/* Card content */}
-              <div className="flex-shrink-0 w-full h-[160px] relative group">
-                {book.coverImage && (
-                  <img
-                    src={book.coverImage}
-                    alt={book.title}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 rounded-t-xl"
-                  />
-                )}
-                {/* Gradient overlay at the bottom, only on hover */}
-                <div className="absolute left-0 bottom-0 w-full h-1/4 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                <button
-                  onClick={() => toggleFavorite(book.id)}
-                  className="absolute top-2 right-2 p-1 rounded-full bg-white/80 backdrop-blur-sm transition-all duration-300 hover:bg-white hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label={favorites.has(book.id) ? "Remove from favorites" : "Add to favorites"}
-                >
-                  <span className={`text-lg transition-all duration-300 ${favorites.has(book.id) ? 'text-error scale-110' : 'text-gray-400'}`}> 
-                    {favorites.has(book.id) ? '❤️' : '🤍'}
-                  </span>
-                </button>
-              </div>
-              <div className="flex-1 flex flex-col justify-between p-4 overflow-hidden">
-                <CardHeader className="p-0 pb-1 truncate">
-                  <CardTitle className="text-base group-hover:text-primary transition-colors duration-300 truncate font-semibold" title={book.title}>{book.title}</CardTitle>
-                  <CardDescription className="text-xs group-hover:text-text-secondary transition-colors duration-300 truncate" title={book.authors.join(', ')}>
-                    By {book.authors.join(', ')}
-                  </CardDescription>
-                  {typeof book.price === 'number' && (
-                    <span className="inline-block mt-1 px-2 py-0.5 bg-secondary text-white text-xs font-bold rounded-full shadow-sm border border-yellow-300">
-                      ${book.price.toFixed(2)}
-                    </span>
-                  )}
-                </CardHeader>
-                <CardContent className="p-0 pb-1">
-                  <div className="space-y-1 text-xs text-text-secondary truncate">
-                    {book.firstPublishYear && (
-                      <p>Year: {book.firstPublishYear}</p>
-                    )}
-                    {book.editionCount && (
-                      <p>Editions: {book.editionCount}</p>
-                    )}
-                    {book.ratingsAverage && (
-                      <p>Rating: {getRatingStars(book.ratingsAverage)}</p>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter className="p-0 mt-auto">
-                  <div className="flex gap-2 w-full">
-                    <Button variant="outline" size="sm" asChild className="transition-all duration-300 hover:scale-105 text-xs px-2 py-1 h-8 min-h-0 w-full border-primary text-primary font-semibold">
-                      <Link to={`/books/${book.id}`}>View</Link>
-                    </Button>
-                    {isLoggedIn && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setShowAddToCollection(book.id)}
-                        className="transition-all duration-300 hover:scale-105 text-xs px-2 py-1 h-8 min-h-0 w-full border-secondary text-secondary font-semibold"
-                      >
-                        +
-                      </Button>
-                    )}
-                  </div>
-                </CardFooter>
-                {/* Add to Collection Modal (move inside Card) */}
-                {showAddToCollection === book.id && (
-                  <div className="border-t p-4 bg-muted animate-in slide-in-from-top-2 duration-300 rounded-b-xl">
-                    <form onSubmit={handleCollectionSubmit((data) => handleAddToCollection(book, data))} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="collectionId">Collection</Label>
-                        <select
-                          {...registerCollection('collectionId')}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
-                        >
-                          <option value="">Select a collection</option>
-                          {collections.map((collection) => (
-                            <option key={collection._id} value={collection._id}>
-                              {collection.name}
-                            </option>
-                          ))}
-                        </select>
-                        {collectionErrors.collectionId && (
-                          <p className="text-sm text-error">{collectionErrors.collectionId.message}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="readStatus">Reading Status</Label>
-                        <select
-                          {...registerCollection('readStatus')}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
-                        >
-                          <option value="to-read">To Read</option>
-                          <option value="reading">Currently Reading</option>
-                          <option value="completed">Completed</option>
-                          <option value="abandoned">Abandoned</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="notes">Notes (Optional)</Label>
-                        <Input
-                          {...registerCollection('notes')}
-                          placeholder="Add your thoughts about this book..."
-                          className="focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-surface"
-                        />
-                        {collectionErrors.notes && (
-                          <p className="text-sm text-error">{collectionErrors.notes.message}</p>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button type="submit" size="sm" disabled={adding} className="flex-1 transition-all duration-300 hover:scale-105 bg-primary text-white rounded-lg">
-                          {adding ? (
-                            <div className="flex items-center gap-2">
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                              Adding...
-                            </div>
-                          ) : (
-                            'Add to Collection'
-                          )}
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setShowAddToCollection(null);
-                            resetCollection();
-                          }}
-                          className="transition-all duration-300 hover:scale-105 border-muted text-text-secondary rounded-lg"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
+          <div className="flex justify-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-7xl">
+              {searchResults.map((book) => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  onToggleFavorite={toggleFavorite}
+                  isFavorite={favorites.has(book.id)}
+                  onAddToCollection={setShowAddToCollection}
+                  showAddButton={isLoggedIn}
+                  isLoggedIn={isLoggedIn}
+                />
+              ))}
+            </div>
           </div>
+          
+          {/* Add to Collection Modal */}
+          {showAddToCollection && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 className="text-lg font-semibold mb-4">Add to Collection</h3>
+                <form onSubmit={handleCollectionSubmit((data) => handleAddToCollection(searchResults.find(b => b.id === showAddToCollection)!, data))} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="collectionId">Collection</Label>
+                    <select
+                      {...registerCollection('collectionId')}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
+                    >
+                      <option value="">Select a collection</option>
+                      {collections.map((collection) => (
+                        <option key={collection._id} value={collection._id}>
+                          {collection.name}
+                        </option>
+                      ))}
+                    </select>
+                    {collectionErrors.collectionId && (
+                      <p className="text-sm text-error">{collectionErrors.collectionId.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="readStatus">Reading Status</Label>
+                    <select
+                      {...registerCollection('readStatus')}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
+                    >
+                      <option value="to-read">To Read</option>
+                      <option value="reading">Currently Reading</option>
+                      <option value="completed">Completed</option>
+                      <option value="abandoned">Abandoned</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notes (Optional)</Label>
+                    <Input
+                      {...registerCollection('notes')}
+                      placeholder="Add your thoughts about this book..."
+                      className="focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-surface"
+                    />
+                    {collectionErrors.notes && (
+                      <p className="text-sm text-error">{collectionErrors.notes.message}</p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" disabled={adding} className="flex-1 transition-all duration-300 hover:scale-105 bg-primary text-white rounded-lg">
+                      {adding ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                          Adding...
+                        </div>
+                      ) : (
+                        'Add to Collection'
+                      )}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setShowAddToCollection(null);
+                        resetCollection();
+                      }}
+                      className="transition-all duration-300 hover:scale-105 border-muted text-text-secondary rounded-lg"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
           {pagination && pagination.totalPages > 1 && (
             <div className="flex justify-center gap-4 mt-8">
               <Button

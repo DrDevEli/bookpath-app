@@ -1,4 +1,5 @@
 import React from 'react';
+import BookCard from './BookCard';
 
 const featuredBooks = [
   {
@@ -51,33 +52,18 @@ export default function FeaturedBooks() {
       <h2 className="text-2xl font-bold mb-4">Featured Books</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {featuredBooks.map((book, idx) => (
-          <div
+          <BookCard
             key={idx}
-            className="flex flex-col bg-white rounded-lg shadow hover:shadow-lg transition p-4 items-center"
-            style={{
-              background: 'linear-gradient(135deg, rgba(74, 0, 127, 0.1) 0%, rgba(0, 230, 230, 0.1) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            book={{
+              id: `featured-${idx}`,
+              title: book.title,
+              authors: [book.author],
+              coverImage: book.cover,
+              description: book.description,
+              price: book.price,
+              openLibraryKey: '',
             }}
-          >
-            <img
-              src={book.cover}
-              alt={book.title}
-              className="w-20 h-28 object-cover rounded mb-2 flex-shrink-0"
-            />
-            <div className="w-full text-center">
-              <div className="font-semibold text-lg mb-1">{book.title}</div>
-              <div className="text-sm text-gray-600 mb-1">by {book.author}</div>
-              <div className="text-gray-700 text-sm mb-2">{book.description}</div>
-              <div className="italic text-xs text-teal-500 mb-2">Discovery...</div>
-              {typeof book.price === 'number' && (
-                <span className="inline-block mt-1 px-2 py-0.5 bg-gradient-to-r from-yellow-200 via-yellow-300 to-yellow-400 text-yellow-900 text-xs font-bold rounded-full shadow-sm border border-yellow-300">
-                  ${book.price.toFixed(2)}
-                </span>
-              )}
-            </div>
-          </div>
+          />
         ))}
       </div>
     </div>
