@@ -59,6 +59,9 @@ export function BookSearch() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<string>('');
+  const [condition, setCondition] = useState<string>(''); // '', 'new', 'used'
+  const [sort, setSort] = useState<string>(''); // '', 'newest', 'author_az'
   const [collections, setCollections] = useState<Collection[]>([]);
   const [showAddToCollection, setShowAddToCollection] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -106,6 +109,9 @@ export function BookSearch() {
       const params = new URLSearchParams();
       if (data.title) params.append('title', data.title);
       if (data.author) params.append('author', data.author);
+      if (category) params.append('category', category);
+      if (condition) params.append('condition', condition);
+      if (sort) params.append('sort', sort);
 
       const response = await api.get(`/books/search?${params.toString()}`);
       
@@ -156,6 +162,9 @@ export function BookSearch() {
     try {
       const params = new URLSearchParams();
       // Re-construct search parameters (you might want to store these in state)
+      if (category) params.append('category', category);
+      if (condition) params.append('condition', condition);
+      if (sort) params.append('sort', sort);
       params.append('page', page.toString());
       
       const response = await api.get(`/books/search?${params.toString()}`);
@@ -256,6 +265,57 @@ export function BookSearch() {
                 disabled={loading}
                 className="bg-muted border-0 focus:ring-2 focus:ring-primary text-text-primary"
               />
+            </div>
+            {/* Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="category" className="text-text-primary">Category</Label>
+                <select
+                  id="category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
+                >
+                  <option value="">Any</option>
+                  <option value="Fiction">Fiction</option>
+                  <option value="Non-fiction">Non-fiction</option>
+                  <option value="Sci-Fi">Sci-Fi</option>
+                  <option value="Fantasy">Fantasy</option>
+                  <option value="Mystery">Mystery</option>
+                  <option value="Romance">Romance</option>
+                  <option value="History">History</option>
+                  <option value="Biography">Biography</option>
+                  <option value="Self-Help">Self-Help</option>
+                  <option value="Business">Business</option>
+                  <option value="Tech">Tech</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="condition" className="text-text-primary">Condition</Label>
+                <select
+                  id="condition"
+                  value={condition}
+                  onChange={(e) => setCondition(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
+                >
+                  <option value="">Any</option>
+                  <option value="new">New</option>
+                  <option value="used">Used</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="sort" className="text-text-primary">Sort By</Label>
+                <select
+                  id="sort"
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
+                >
+                  <option value="">Relevance</option>
+                  <option value="newest">Newest</option>
+                  <option value="author_az">Author A–Z</option>
+                </select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="author" className="text-text-primary">Author</Label>

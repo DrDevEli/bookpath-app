@@ -7,7 +7,7 @@ import booklookerService from "./bookLookerService.js";
 import logger from "../config/logger.js";
 
 export default class BookSearchService {
-  async search({ title, author, page = 1 }) {
+  async search({ title, author, page = 1, category, condition, sort }) {
     if (!title && !author) {
       throw new ApiError(400, "At least one search parameter must be provided");
     }
@@ -83,14 +83,37 @@ export default class BookSearchService {
         });
       }
 
-      // Deduplicate results based on title and author
-      const uniqueBooks = this.deduplicateBooks(allBooks);
+      // Normalize categories and condition
+      const normalized = allBooks.map((b) => ({
+        ...b,
+        category: this.normalizeCategory(b.subjects || b.genres || b.category),
+        condition: b.condition && (b.condition.toLowerCase() === 'new' || b.condition.toLowerCase() === 'used')
+          ? b.condition.toLowerCase()
+          : (b.source === 'booklooker' ? (b.condition?.toLowerCase() || 'unknown') : 'unknown'),
+      }));
 
-      // Add Amazon affiliate links (optional - can be implemented later)
-      const booksWithAffiliateLinks = await this.addAffiliateLinks(uniqueBooks);
+      // Apply condition filter (exclude unknown if filter is set)
+      let filtered = normalized;
+      if (condition === 'new' || condition === 'used') {
+        filtered = filtered.filter((b) => b.condition === condition);
+      }
+
+      // Apply category filter if provided
+      if (category) {
+        filtered = filtered.filter((b) => b.category === category);
+      }
+
+      // Deduplicate results based on title and author
+      const uniqueBooks = this.deduplicateBooks(filtered);
+
+      // Sorting
+      const sortedBooks = this.sortBooks(uniqueBooks, sort);
+
+      // Add Amazon affiliate links
+      const booksWithAffiliateLinks = await this.addAffiliateLinks(sortedBooks);
 
       // Calculate pagination
-      const totalResults = uniqueBooks.length;
+      const totalResults = sortedBooks.length;
       const limit = 20;
       const totalPages = Math.ceil(totalResults / limit);
       const startIndex = (page - 1) * limit;
@@ -155,6 +178,45 @@ export default class BookSearchService {
     }
 
     return uniqueBooks;
+  }
+
+  normalizeCategory(raw) {
+    if (!raw) return undefined;
+    const lower = Array.isArray(raw) ? raw.map((r) => String(r).toLowerCase()) : [String(raw).toLowerCase()];
+    const map = [
+      { key: 'fiction', val: 'Fiction' },
+      { key: 'non-fiction', val: 'Non-fiction' },
+      { key: 'nonfiction', val: 'Non-fiction' },
+      { key: 'science fiction', val: 'Sci-Fi' },
+      { key: 'sci-fi', val: 'Sci-Fi' },
+      { key: 'fantasy', val: 'Fantasy' },
+      { key: 'mystery', val: 'Mystery' },
+      { key: 'romance', val: 'Romance' },
+      { key: 'history', val: 'History' },
+      { key: 'biography', val: 'Biography' },
+      { key: 'self-help', val: 'Self-Help' },
+      { key: 'self help', val: 'Self-Help' },
+      { key: 'business', val: 'Business' },
+      { key: 'technology', val: 'Tech' },
+      { key: 'computers', val: 'Tech' },
+    ];
+    for (const entry of map) {
+      if (lower.some((l) => l.includes(entry.key))) return entry.val;
+    }
+    return undefined;
+  }
+
+  sortBooks(books, sort) {
+    if (!sort) return books;
+    const arr = [...books];
+    switch (sort) {
+      case 'newest':
+        return arr.sort((a, b) => (b.firstPublishYear || 0) - (a.firstPublishYear || 0));
+      case 'author_az':
+        return arr.sort((a, b) => (a.authors?.[0] || '').localeCompare(b.authors?.[0] || ''));
+      default:
+        return arr;
+    }
   }
 
   /**

@@ -15,6 +15,8 @@ interface Book {
   ratingsCount?: number;
   openLibraryKey?: string;
   price?: number;
+  condition?: 'new' | 'used' | 'unknown';
+  category?: string;
   description?: string;
   readStatus?: 'to-read' | 'reading' | 'completed' | 'abandoned';
   rating?: number;
@@ -128,6 +130,9 @@ export function BookCard({
           {book.firstPublishYear && (
             <p>Year: {book.firstPublishYear}</p>
           )}
+          {book.category && (
+            <p>Category: {book.category}</p>
+          )}
           {book.editionCount && (
             <p>Editions: {book.editionCount}</p>
           )}
@@ -175,6 +180,15 @@ export function BookCard({
         {typeof book.price === 'number' && (
           <span className="inline-block mb-3 px-2 py-0.5 bg-gradient-to-r from-yellow-200 via-yellow-300 to-yellow-400 text-yellow-900 text-xs font-bold rounded-full shadow-sm border border-yellow-300">
             ${book.price.toFixed(2)}
+          </span>
+        )}
+        {book.condition && book.condition !== 'unknown' && (
+          <span className={`inline-block mb-3 ml-1 px-2 py-0.5 text-xs font-bold rounded-full shadow-sm border ${
+            book.condition === 'new' 
+            ? 'bg-green-100 text-green-800 border-green-200' 
+            : 'bg-blue-100 text-blue-800 border-blue-200'
+          }`}>
+            {book.condition === 'new' ? 'New' : 'Used'}
           </span>
         )}
 

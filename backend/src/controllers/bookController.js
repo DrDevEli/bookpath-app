@@ -9,17 +9,24 @@ import Book from "../models/Book.js";
 class BookController {
   static async searchBooks(req, res, next) {
     try {
-      const { title, author, page = 1 } = req.query;
+      const { title, author, page = 1, category, condition, sort } = req.query;
       if (!title && !author) throw new ApiError(400, 'At least one of "title" or "author" is required');
 
-      const cacheKey = `search:${title || ''}:${author || ''}:${page}`;
+      const cacheKey = `search:${title || ''}:${author || ''}:${category || ''}:${condition || ''}:${sort || ''}:${page}`;
       const cached = await redis.get(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached);
         return res.json({ success: true, ...parsed });
       }
 
-      const result = await new BookSearchService().search({ title, author, page: parseInt(page) });
+      const result = await new BookSearchService().search({
+        title,
+        author,
+        page: parseInt(page),
+        category: category || undefined,
+        condition: condition || undefined,
+        sort: sort || undefined,
+      });
       await redis.set(cacheKey, JSON.stringify(result), "EX", 3600); // cache 1 hour
       res.json({ success: true, ...result });
     } catch (error) {

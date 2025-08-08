@@ -12,7 +12,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { path: '/', label: 'Home' },
     { path: '/search', label: 'Search' },
-    { path: '/category', label: 'Category' },
     ...(isLoggedIn ? [{ path: '/collections', label: 'Collections' }] : []),
   ];
 

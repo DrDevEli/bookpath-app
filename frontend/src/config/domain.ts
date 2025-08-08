@@ -2,8 +2,8 @@
 export const DOMAIN_CONFIG = {
   // Production domain
   PRODUCTION: {
-    FRONTEND: process.env.REACT_APP_FRONTEND_URL || 'https://yourdomain.com',
-    BACKEND: process.env.REACT_APP_BACKEND_URL || 'https://api.yourdomain.com',
+    FRONTEND: process.env.REACT_APP_FRONTEND_URL || 'https://bookpath.vercel.app',
+    BACKEND: process.env.REACT_APP_BACKEND_URL || 'https://api.bookpath.eu',
   },
   
   // Development domain

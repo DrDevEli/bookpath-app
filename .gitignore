@@ -33,6 +33,8 @@ Thumbs.db
 # Build output
 coverage/
 build/
+frontend/build/
+backend/coverage/
 tmp/
 tmp/ssl/*.crt
 tmp/ssl/*.key
@@ -61,8 +63,68 @@ openai.log
 .aider.tags.cache.v4/
 .aider*
 
+
+
+# Global env files 
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+!**/.env.sample
+
+# Frontend (CRA/Vite-style) envs
+/frontend/.env
+/frontend/.env.*
+/frontend/.env.example
+/frontend/.env.sample
 frontend/.env
 frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
+
+# Backend envs
+/backend/.env
+/backend/.env.*
+/backend/.env.example
+/backend/.env.sample
+backend/.env
+backend/.env.local
+backend/.env.development.local
+backend/.env.test.local
+backend/.env.production.local
+
+# Package-level .npmrc (can contain auth tokens)
+**/.npmrc
+# Vercel project files (can expose project/org IDs; tokens should never be committed)
+**/.vercel/**
+
+#SSL/TLS keys and certs
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+# If you keep cert chains locally (public), still ignore to avoid confusion
+**/*.crt
+**/*.cer
+
+# Project-specific SSL dirs
+/tmp/ssl/**
+/backend/src/config/ssl/**
+
+# Cloud/service credentials (service account, provider creds)
+**/*service-account*.json
+**/*credentials*.json
+**/*_secrets*.json
+**/*secret*.json
+**/*secret*.* 
+**/*private*.*
+
+# Logs can accidentally capture tokens
+**/*.log
+/logs/**
+/backend/logs/**
+
+# Local tooling that may store tokens
+**/.envrc
+**/.direnv/
