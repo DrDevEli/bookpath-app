@@ -1,7 +1,7 @@
 import axios from 'axios';
 import DOMAIN_CONFIG from './config/domain';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || `${DOMAIN_CONFIG.getBackendUrl()}/api`;
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || `${DOMAIN_CONFIG.getBackendUrl()}`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

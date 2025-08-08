@@ -111,22 +111,22 @@ export function BookCard({
       </div>
 
       {/* Book Info */}
-      <div className="w-full text-center flex-1 flex flex-col">
-        <div className="font-semibold text-lg mb-1 line-clamp-2 group-hover:text-primary transition-colors duration-300" title={book.title}>
+      <div className="w-full text-center flex-1 flex flex-col" style={{ color: '#dbcd90' }}>
+        <div className="font-semibold text-lg mb-1 line-clamp-2 group-hover:text-primary transition-colors duration-300" title={book.title} style={{ color: '#dbcd90' }}>
           {book.title}
         </div>
-        <div className="text-sm text-gray-600 mb-2 line-clamp-1" title={book.authors.join(', ')}>
+        <div className="text-sm mb-2 line-clamp-1" title={book.authors.join(', ')} style={{ color: '#dbcd90' }}>
           by {book.authors.join(', ')}
         </div>
         
         {book.description && (
-          <div className="text-gray-700 text-xs mb-2 line-clamp-3" title={book.description}>
+          <div className="text-xs mb-2 line-clamp-3" title={book.description} style={{ color: '#dbcd90' }}>
             {book.description}
           </div>
         )}
 
         {/* Book Details */}
-        <div className="space-y-1 text-xs text-gray-600 mb-3">
+        <div className="space-y-1 text-xs mb-3" style={{ color: '#dbcd90' }}>
           {book.firstPublishYear && (
             <p>Year: {book.firstPublishYear}</p>
           )}
@@ -156,7 +156,7 @@ export function BookCard({
         {/* Progress Bar */}
         {showProgress && book.progress !== undefined && book.progress > 0 && (
           <div className="mb-3">
-            <div className="flex justify-between text-xs text-gray-600 mb-1">
+            <div className="flex justify-between text-xs mb-1" style={{ color: '#dbcd90' }}>
               <span>Progress</span>
               <span>{book.progress}%</span>
             </div>
@@ -171,7 +171,7 @@ export function BookCard({
 
         {/* Notes */}
         {book.notes && (
-          <div className="text-xs text-gray-600 mb-3 italic">
+          <div className="text-xs mb-3 italic" style={{ color: '#dbcd90' }}>
             "{book.notes}"
           </div>
         )}
