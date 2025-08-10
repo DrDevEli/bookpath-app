@@ -12,7 +12,11 @@
     "test:openlibrary": "node test-openlibrary.js",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "docs:generate": "swagger-autogen swagger.js",
+    "docs:lint": "redocly lint ./docs/openapi.yaml",
+    "docs:build": "node -e \"console.log(JSON.stringify(require('yaml').parse(require('fs').readFileSync('docs/openapi.yaml','utf8'))))\" > docs/openapi.json",
+    "docs:preview": "npx redoc-cli serve docs/openapi.yaml --watch",
+    "docs:types": "npx -y openapi-typescript@latest docs/openapi.yaml -o ../shared/types/openapi.ts",
+    "docs:client": "npx -y @openapitools/openapi-generator-cli@latest generate -g typescript-axios -i docs/openapi.yaml -o ../frontend/src/api-client --additional-properties=useSingleRequestParameter=true,withSeparateModelsAndApi=true,modelPropertyNaming=original",
     "check-ports": "node scripts/check-ports.js"
   },
   "dependencies": {
@@ -34,9 +38,9 @@
     "passport-local": "^1.0.0",
     "rate-limiter-flexible": "^7.1.1",
     "speakeasy": "^2.0.0",
-    "swagger-autogen": "^2.23.7",
-    "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^4.6.3",
+    "yaml": "^2.4.5",
+    "@redocly/cli": "^1.28.3",
     "uuid": "^11.1.0",
     "winston": "^3.17.0"
   },

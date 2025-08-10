@@ -251,8 +251,15 @@ router.delete(
  *       200:
  *         description: Collections retrieved successfully
  */
+// Backward compatible category route and preferred by-category route
 router.get(
   "/category/:category",
+  authMiddleware(),
+  rateLimiterMiddleware,
+  CollectionController.getCollectionsByCategory
+);
+router.get(
+  "/by-category/:category",
   authMiddleware(),
   rateLimiterMiddleware,
   CollectionController.getCollectionsByCategory

@@ -17,7 +17,8 @@ import {
   validateRedisConfig
 } from "./src/utils/envValidator.js";
 import swaggerUi from "swagger-ui-express";
-import swaggerJsdoc from "swagger-jsdoc";
+import fs from "fs";
+import path from "path";
 
 // Load environment variables
 dotenv.config();
@@ -34,30 +35,18 @@ const config = getEnvConfig({
   TRUST_PROXY: { type: "boolean", default: false },
 });
 
-// Swagger configuration
-const swaggerOptions = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "BookPath API",
-      version: "1.0.0",
-      description: "API documentation for BookPath application",
-    },
-    servers: [
-      {
-        url: `http://localhost:${config.PORT || 3001}`,
-        description: "Development server",
-      },
-      {
-        url: "https://api.bookpath.eu",
-        description: "Production server",
-      },
-    ],
-  },
-  apis: ["./src/routes/*.js"], // Path to the API docs
-};
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
+// Load OpenAPI YAML spec
+const openApiPath = path.resolve(path.dirname(new URL(import.meta.url).pathname), "./docs/openapi.yaml");
+const openApiSpec = fs.readFileSync(openApiPath, "utf8");
+let swaggerSpec;
+try {
+  // Lazy import yaml parser to avoid adding heavy deps to cold path; fallback if not installed
+  const yaml = (await import('yaml')).default;
+  swaggerSpec = yaml.parse(openApiSpec);
+} catch (err) {
+  // If yaml module is not available, serve raw string; swagger-ui-express can accept JSON only, so parse failure is fatal
+  throw new Error("YAML parser not available. Please add 'yaml' to dependencies.");
+}
 
 // Validate required environment variables
 validateEnv([
@@ -167,11 +156,11 @@ app.post("/api/chefaodacasa/cache/reset", async (req, res) => {
   }
 });
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/books", bookRoutes);
-app.use("/api/collections", collectionRoutes);
-app.use("/api/users", userRoutes);
+// Routes (versioned)
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/books", bookRoutes);
+app.use("/api/v1/collections", collectionRoutes);
+app.use("/api/v1/users", userRoutes);
 
 // Add Swagger documentation
 app.use(

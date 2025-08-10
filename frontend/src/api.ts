@@ -1,8 +1,11 @@
 import axios from 'axios';
 import DOMAIN_CONFIG from './config/domain';
 
-// API base URL
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || DOMAIN_CONFIG.getBackendUrl();
+// Ensure API base URL includes /api/v1 suffix
+const rawBase = process.env.REACT_APP_API_BASE_URL || DOMAIN_CONFIG.getBackendUrl();
+const trimmedBase = (rawBase || '').replace(/\/+$/, '');
+const ensureSuffix = (base: string): string => base.endsWith('/api/v1') ? base : base.endsWith('/api') ? `${base}/v1` : `${base}/api/v1`;
+const API_BASE_URL = ensureSuffix(trimmedBase);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

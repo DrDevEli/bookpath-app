@@ -103,7 +103,7 @@ export default class BookSearchService {
         filtered = filtered.filter((b) => b.category === category);
       }
 
-      // Deduplicate results based on title and author
+      // Deduplicate results using stable identifiers where possible
       const uniqueBooks = this.deduplicateBooks(filtered);
 
       // Sorting
@@ -166,10 +166,25 @@ export default class BookSearchService {
     const uniqueBooks = [];
 
     for (const book of books) {
-      // Create a key based on normalized title and author
-      const normalizedTitle = book.title?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
-      const normalizedAuthors = book.authors?.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, '')).join('') || '';
-      const key = `${normalizedTitle}-${normalizedAuthors}`;
+      const isbn = Array.isArray(book.isbn) ? book.isbn[0] : book.isbn;
+      const candidateAuthors = Array.isArray(book.authors)
+        ? book.authors
+        : Array.isArray(book.author_name)
+        ? book.author_name
+        : book.author
+        ? [book.author]
+        : [];
+      const normalizedTitle = (book.title || '')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+      const normalizedAuthors = candidateAuthors
+        .map((a) => a.toString().toLowerCase().replace(/[^a-z0-9]/g, ''))
+        .join('');
+
+      const key = isbn
+        ? `isbn:${isbn}`
+        : `${normalizedTitle}-${normalizedAuthors}`;
 
       if (!seen.has(key)) {
         seen.add(key);
