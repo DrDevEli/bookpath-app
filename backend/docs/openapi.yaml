@@ -708,6 +708,309 @@ components:
           type: integer
           description: Time in seconds to wait before making another request (only present when rate limited)
 
+    # Request schemas for various endpoints
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+          description: "User's email address"
+        password:
+          type: string
+          format: password
+          example: "mypassword123"
+          description: "User's password"
+
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[a-zA-Z0-9_]+$"
+          example: "johndoe"
+          description: "Alphanumeric characters and underscores only"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+          description: "Must be a valid email address and unique"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: "mypassword123"
+          description: "Minimum 6 characters"
+
+    PasswordChangeRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          example: "currentpassword123"
+          description: "Current password for verification"
+        newPassword:
+          type: string
+          format: password
+          minLength: 6
+          example: "newpassword456"
+          description: "New password (minimum 6 characters)"
+
+    UpdateProfileRequest:
+      type: object
+      minProperties: 1
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[a-zA-Z0-9_]+$"
+          example: "johndoe_updated"
+          description: "New username (3-30 characters, alphanumeric and underscores only)"
+        email:
+          type: string
+          format: email
+          example: "newemail@example.com"
+          description: "New email address"
+        firstName:
+          type: string
+          maxLength: 50
+          example: "John"
+          description: "First name (max 50 characters)"
+        lastName:
+          type: string
+          maxLength: 50
+          example: "Doe"
+          description: "Last name (max 50 characters)"
+        bio:
+          type: string
+          maxLength: 500
+          example: "Book enthusiast and avid reader"
+          description: "User bio (max 500 characters)"
+
+    UpdatePreferencesRequest:
+      type: object
+      required: [preferences]
+      properties:
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
+
+    UpdateNotificationPreferencesRequest:
+      type: object
+      required: [emailNotifications]
+      properties:
+        emailNotifications:
+          type: object
+          properties:
+            marketing:
+              type: boolean
+              default: false
+              description: "Receive marketing emails"
+            productUpdates:
+              type: boolean
+              default: true
+              description: "Receive product update notifications"
+            securityAlerts:
+              type: boolean
+              default: true
+              description: "Receive security alert notifications"
+            collectionShares:
+              type: boolean
+              default: true
+              description: "Receive notifications when collections are shared"
+
+    CreateCollectionRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "My Favorite Books"
+          description: "Collection name (required, 1-100 characters)"
+        description:
+          type: string
+          maxLength: 500
+          example: "A collection of my all-time favorite books"
+          description: "Collection description (optional, max 500 characters)"
+        isPublic:
+          type: boolean
+          default: false
+          example: false
+          description: "Whether the collection is publicly visible"
+        category:
+          type: string
+          enum: [general, wishlist, favorites, currently-reading, completed, custom]
+          default: general
+          example: "favorites"
+          description: "Collection category"
+        color:
+          type: string
+          pattern: "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+          default: "#3B82F6"
+          example: "#FF6B6B"
+          description: "Collection color (hex format)"
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+          default: []
+          example: ["fiction", "classics"]
+          description: "Collection tags (max 50 characters each)"
+
+    UpdateCollectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Updated Collection Name"
+          description: "Collection name (1-100 characters)"
+        description:
+          type: string
+          maxLength: 500
+          example: "Updated description"
+          description: "Collection description (max 500 characters)"
+        isPublic:
+          type: boolean
+          example: true
+          description: "Whether the collection is publicly visible"
+        category:
+          type: string
+          enum: [general, wishlist, favorites, currently-reading, completed, custom]
+          example: "favorites"
+          description: "Collection category"
+        color:
+          type: string
+          pattern: "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+          example: "#FF6B6B"
+          description: "Collection color (hex format)"
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+          example: ["fiction", "classics", "updated"]
+          description: "Collection tags (max 50 characters each)"
+        sortBy:
+          type: string
+          enum: [addedAt, title, author, rating, dateFinished]
+          example: "title"
+          description: "Sort books by field"
+        sortOrder:
+          type: string
+          enum: [asc, desc]
+          example: "asc"
+          description: "Sort order"
+
+    # Response schemas
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        accessToken:
+          type: string
+          description: "JWT access token (1 hour expiration)"
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refreshToken:
+          type: string
+          description: "JWT refresh token (7 days expiration)"
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              example: "507f1f77bcf86cd799439011"
+            username:
+              type: string
+              example: "johndoe"
+            email:
+              type: string
+              example: "john@example.com"
+            role:
+              type: string
+              example: "user"
+
+    TwoFactorRequiredResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        requiresTwoFactor:
+          type: boolean
+          example: true
+        userId:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+          description: "User ID needed for 2FA verification"
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/UserProfile"
+
+    CollectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/BookCollection"
+
+    CollectionsListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        count:
+          type: integer
+          example: 3
+          description: "Number of collections returned"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookCollection"
+
+    DeleteAccountRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+          example: "mypassword123"
+          description: "Password confirmation required for account deletion"
+
 # Security Documentation
 x-security-documentation:
   authentication:
@@ -996,6 +1299,75 @@ paths:
         "201":
           description: User registered successfully
           content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Registration successful. Please verify your email."
+        "400":
+          description: Validation error or invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validation_error:
+                  summary: Validation error
+                  value:
+                    success: false
+                    error: "Validation error"
+                    details:
+                      field: "email"
+                      code: "INVALID_FORMAT"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                missing_fields:
+                  summary: Missing required fields
+                  value:
+                    success: false
+                    error: "Username, email and password are required"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "409":
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "User with this email or username already exists"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Too many requests. Please try again later."
+                timestamp: "2024-01-01T12:00:00.000Z"
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              description: Maximum requests allowed
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Requests remaining in window
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              description: Seconds until window resets
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retry
             application/json:
               schema:
                 type: object
