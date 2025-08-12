@@ -58,6 +58,8 @@ out/
 openai.key
 openai.log
 
+.kiro*
+.kiro.log
 .aider.chat.history.md
 .aider.input.history
 .aider.tags.cache.v4/
