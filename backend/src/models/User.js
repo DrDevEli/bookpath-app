@@ -4,6 +4,12 @@ import * as openpgp from "openpgp";
 import AuditLog from "./AuditLog.js";
 
 const userSchema = new mongoose.Schema({
+  role: {
+    type: String,
+    enum: ["user", "chefaodacasa"],
+    default: "user",
+    index: true,
+  },
   username: { type: String, required: true, unique: true, trim: true },
   email: {
     type: String,
@@ -76,6 +82,14 @@ const userSchema = new mongoose.Schema({
     enum: ["free", "pro"],
     default: "free",
   },
+  stripeCustomerId: {
+    type: String,
+    index: true,
+  },
+  stripeSubscriptionId: {
+    type: String,
+    index: true,
+  },
   tokenVersion: { type: Number, default: 0 },
 
   preferences: {
@@ -84,6 +98,16 @@ const userSchema = new mongoose.Schema({
       theme: "light",
       booksPerPage: 10,
       defaultSearchType: "title",
+    },
+  },
+
+  emailNotifications: {
+    type: Object,
+    default: {
+      marketing: true,
+      productUpdates: true,
+      securityAlerts: true,
+      collectionShares: true,
     },
   },
 

@@ -413,6 +413,207 @@ class UserController {
       next(error);
     }
   }
+
+  static async getNotificationPreferences(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const user = await User.findById(userId).select("emailNotifications");
+
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          emailNotifications: user.emailNotifications || {
+            marketing: true,
+            productUpdates: true,
+            securityAlerts: true,
+            collectionShares: true,
+          },
+        },
+      });
+    } catch (error) {
+      logger.error("Get notification preferences error", {
+        userId: req.user?.id,
+        error: error.message,
+      });
+      next(error);
+    }
+  }
+
+  static async updateNotificationPreferences(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { emailNotifications } = req.body;
+
+      if (!emailNotifications || typeof emailNotifications !== "object") {
+        throw new ApiError(400, "Valid emailNotifications object is required");
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { emailNotifications },
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedUser) {
+        throw new ApiError(404, "User not found");
+      }
+
+      // Log the preference change
+      const AuditLog = mongoose.model("AuditLog");
+      await AuditLog.logAction(
+        userId,
+        "notification_preferences_updated",
+        { emailNotifications },
+        req
+      );
+
+      logger.info("User notification preferences updated", { userId });
+
+      res.status(200).json({
+        success: true,
+        message: "Notification preferences updated successfully",
+      });
+    } catch (error) {
+      logger.error("Update notification preferences error", {
+        userId: req.user?.id,
+        error: error.message,
+      });
+      next(error);
+    }
+  }
+
+  static async exportUserData(req, res, next) {
+    try {
+      const userId = req.user.id;
+
+      // Get user data
+      const user = await User.findById(userId).select(
+        "-password -resetPasswordToken -resetPasswordExpires -emailVerificationToken -emailVerificationExpires -twoFactorSecret"
+      );
+
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+
+      // Get user's collections
+      const BookCollection = mongoose.model("BookCollection");
+      const collections = await BookCollection.find({ userId }).lean();
+
+      // Get audit logs for the user
+      const AuditLog = mongoose.model("AuditLog");
+      const auditLogs = await AuditLog.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean();
+
+      const exportData = {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          emailVerified: user.emailVerified,
+          subscriptionTier: user.subscriptionTier,
+          preferences: user.preferences,
+          emailNotifications: user.emailNotifications,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+        collections: collections.map(collection => ({
+          id: collection._id,
+          name: collection.name,
+          description: collection.description,
+          isPublic: collection.isPublic,
+          books: collection.books,
+          createdAt: collection.createdAt,
+          updatedAt: collection.updatedAt,
+        })),
+        auditLogs: auditLogs.map(log => ({
+          action: log.action,
+          metadata: log.metadata,
+          createdAt: log.createdAt,
+        })),
+        exportedAt: new Date().toISOString(),
+      };
+
+      // Log the data export
+      await AuditLog.logAction(userId, "data_exported", {}, req);
+
+      logger.info("User data exported", { userId });
+
+      res.status(200).json({
+        success: true,
+        data: exportData,
+      });
+    } catch (error) {
+      logger.error("Data export error", {
+        userId: req.user?.id,
+        error: error.message,
+      });
+      next(error);
+    }
+  }
+
+  static async deleteAccount(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { password } = req.body;
+
+      if (!password) {
+        throw new ApiError(400, "Password confirmation is required");
+      }
+
+      // Get user with password
+      const user = await User.findById(userId).select("+password");
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+
+      // Verify password
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        logger.warn("Failed account deletion attempt - incorrect password", {
+          userId,
+        });
+        throw new ApiError(400, "Incorrect password");
+      }
+
+      // Delete user's collections
+      const BookCollection = mongoose.model("BookCollection");
+      await BookCollection.deleteMany({ userId });
+
+      // Delete audit logs
+      const AuditLog = mongoose.model("AuditLog");
+      await AuditLog.deleteMany({ userId });
+
+      // Log the account deletion before deleting the user
+      await AuditLog.logAction(userId, "account_deleted", {}, req);
+
+      // Delete the user
+      await User.findByIdAndDelete(userId);
+
+      // Blacklist current JWT
+      const { jti } = req.user;
+      await blacklistJwt(jti, parseInt(process.env.JWT_EXPIRES_IN) || 3600);
+
+      logger.info("User account deleted", { userId });
+
+      res.status(200).json({
+        success: true,
+        message: "Account deleted successfully",
+      });
+    } catch (error) {
+      logger.error("Account deletion error", {
+        userId: req.user?.id,
+        error: error.message,
+      });
+      next(error);
+    }
+  }
 }
 
 export default UserController;

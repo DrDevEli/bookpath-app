@@ -9,8 +9,13 @@ import authRoutes from "./src/routes/authRoutes.js";
 import bookRoutes from "./src/routes/bookRoutes.js";
 import collectionRoutes from "./src/routes/collectionRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
+import billingRoutes from "./src/routes/billingRoutes.js";
+import { handleWebhook } from "./src/services/stripeService.js";
+import seoRoutes from "./src/routes/seoRoutes.js";
 import logger from "./src/config/logger.js";
 import securityMiddleware from "./src/middleware/security.js";
+import { adminOnly } from "./src/middleware/roleMiddleware.js";
+import { getMetrics } from "./src/utils/metrics.js";
 import {
   validateEnv,
   getEnvConfig,
@@ -43,7 +48,7 @@ try {
   // Lazy import yaml parser to avoid adding heavy deps to cold path; fallback if not installed
   const yaml = (await import('yaml')).default;
   swaggerSpec = yaml.parse(openApiSpec);
-} catch (err) {
+} catch {
   // If yaml module is not available, serve raw string; swagger-ui-express can accept JSON only, so parse failure is fatal
   throw new Error("YAML parser not available. Please add 'yaml' to dependencies.");
 }
@@ -78,7 +83,10 @@ app.use(cors(corsOptions));
 // Add compression middleware
 app.use(compression());
 
-// Body parsers
+// Stripe webhook must use raw body. Mount this BEFORE express.json()
+app.use("/api/v1/billing/webhook", express.raw({ type: "application/json" }));
+
+// Body parsers (after webhook)
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
@@ -106,6 +114,17 @@ app.get("/health", async (req, res) => {
     environment: process.env.NODE_ENV,
     uptime: process.uptime(),
   });
+});
+
+// GET /metrics — Prometheus metrics (admin only)
+app.get("/metrics", adminOnly, async (req, res, next) => {
+  try {
+    const metrics = await getMetrics();
+    res.set("Content-Type", "text/plain; version=0.0.4");
+    res.status(200).send(metrics);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // GET /api/chefaodacasa/cache/stats — cache statistics
@@ -164,6 +183,10 @@ app.use("/api/v1/books", bookRoutes);
 app.use("/api/v1/collections", collectionRoutes);
 // Mount /api/v1/users — user routes
 app.use("/api/v1/users", userRoutes);
+// Mount /api/v1/billing — billing routes
+app.use("/api/v1/billing", billingRoutes);
+// SEO routes
+app.use("/seo", seoRoutes);
 
 // Add Swagger documentation
 app.use(

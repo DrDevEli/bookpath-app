@@ -1,6 +1,7 @@
 import axios from "axios";
 import { ApiError } from "../utils/errors.js";
 import logger from "../config/logger.js";
+import { externalApiLatency, externalApiRequests, externalApiErrors } from "../utils/metrics.js";
 
 const GUTENDEX_API_URL = "https://gutendex.com/books/";
 
@@ -18,6 +19,7 @@ export async function searchGutendex({ title, author, page = 1 }) {
       apiUrl: GUTENDEX_API_URL
     });
 
+    const endTimer = externalApiLatency.startTimer({ service: "gutendex" });
     const res = await axios.get(GUTENDEX_API_URL, { 
       params,
       timeout: 10000,
@@ -26,6 +28,8 @@ export async function searchGutendex({ title, author, page = 1 }) {
         'User-Agent': 'BookPath/1.0'
       }
     });
+    endTimer();
+    externalApiRequests.inc({ service: "gutendex", status: res.status });
 
     if (!res.data || !res.data.results) {
       throw new ApiError(500, "Invalid response from Gutendex API");
@@ -57,6 +61,7 @@ export async function searchGutendex({ title, author, page = 1 }) {
 
     return transformedData;
   } catch (error) {
+    externalApiErrors.inc({ service: "gutendex" });
     logger.error("Gutendex search error", {
       error: error.message,
       title,

@@ -1,6 +1,7 @@
 import axios from "axios";
 import logger from "../config/logger.js";
 import { ApiError } from "../utils/errors.js";
+import { externalApiLatency, externalApiRequests, externalApiErrors } from "../utils/metrics.js";
 
 const GOOGLE_BOOKS_API_URL = "https://www.googleapis.com/books/v1/volumes";
 const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY;
@@ -31,6 +32,7 @@ export async function searchGoogleBooks({ title, author, page = 1 }) {
       apiUrl: GOOGLE_BOOKS_API_URL
     });
 
+    const endTimer = externalApiLatency.startTimer({ service: "googlebooks" });
     const res = await axios.get(GOOGLE_BOOKS_API_URL, { 
       params,
       timeout: 10000,
@@ -39,6 +41,8 @@ export async function searchGoogleBooks({ title, author, page = 1 }) {
         'User-Agent': 'BookPath/1.0'
       }
     });
+    endTimer();
+    externalApiRequests.inc({ service: "googlebooks", status: res.status });
 
     if (!res.data) {
       logger.warn("Invalid response from Google Books API");
@@ -77,6 +81,7 @@ export async function searchGoogleBooks({ title, author, page = 1 }) {
 
     return transformedData;
   } catch (error) {
+    externalApiErrors.inc({ service: "googlebooks" });
     logger.error("Google Books search error", {
       error: error.message,
       title,

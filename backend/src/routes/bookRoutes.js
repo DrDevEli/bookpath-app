@@ -12,10 +12,11 @@ router.get(
   BookController.searchBooks
 );
 
-// GET /books/search/advanced — advanced search
+// GET /books/search/advanced — advanced search (requires authentication, pro-only)
 router.get(
   "/search/advanced",
   rateLimiterMiddleware,
+  authMiddleware(),
   BookController.advancedSearch
 );
 

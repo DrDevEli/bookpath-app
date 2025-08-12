@@ -2,6 +2,7 @@ import axios from "axios";
 import { ApiError } from "../utils/errors.js";
 import redis from "../config/redis.js";
 import logger from "../config/logger.js";
+import { externalApiLatency, externalApiRequests, externalApiErrors } from "../utils/metrics.js";
 
 const OPEN_LIBRARY_API_URL = "https://openlibrary.org";
 const CACHE_TTL = parseInt(process.env.SEARCH_CACHE_TTL || "3600");
@@ -52,6 +53,7 @@ class OpenLibraryService {
         apiUrl: `${OPEN_LIBRARY_API_URL}/search.json`
       });
 
+      const endTimer = externalApiLatency.startTimer({ service: "openlibrary" });
       const res = await axios.get(`${OPEN_LIBRARY_API_URL}/search.json`, { 
         params: {
           q: query,
@@ -65,6 +67,8 @@ class OpenLibraryService {
           'User-Agent': 'BookLens/1.0 (https://github.com/your-repo/booklens; your-email@example.com)'
         }
       });
+      endTimer();
+      externalApiRequests.inc({ service: "openlibrary", status: res.status });
 
       logger.debug("Open Library search response", { 
         status: res.status, 
@@ -116,6 +120,7 @@ class OpenLibraryService {
 
       return result;
     } catch (error) {
+      externalApiErrors.inc({ service: "openlibrary" });
       logger.error("Open Library search error", {
         error: error.message,
         title,
@@ -160,6 +165,7 @@ class OpenLibraryService {
     try {
       logger.info("Fetching book details from Open Library", { workId });
 
+      const endTimer = externalApiLatency.startTimer({ service: "openlibrary" });
       const res = await axios.get(`${OPEN_LIBRARY_API_URL}${workId}.json`, {
         timeout: 10000,
         headers: {
@@ -167,6 +173,8 @@ class OpenLibraryService {
           'User-Agent': 'BookLens/1.0 (https://github.com/your-repo/booklens; your-email@example.com)'
         }
       });
+      endTimer();
+      externalApiRequests.inc({ service: "openlibrary", status: res.status });
 
       if (!res.data) {
         throw new ApiError(404, "Book not found");
@@ -193,6 +201,7 @@ class OpenLibraryService {
       logger.info("Book details fetched successfully", { workId });
       return bookData;
     } catch (error) {
+      externalApiErrors.inc({ service: "openlibrary" });
       logger.error("Error fetching book details", {
         error: error.message,
         workId,
@@ -225,6 +234,7 @@ class OpenLibraryService {
     try {
       logger.info("Fetching author details from Open Library", { authorId });
 
+      const endTimer = externalApiLatency.startTimer({ service: "openlibrary" });
       const res = await axios.get(`${OPEN_LIBRARY_API_URL}${authorId}.json`, {
         timeout: 10000,
         headers: {
@@ -232,6 +242,8 @@ class OpenLibraryService {
           'User-Agent': 'BookLens/1.0 (https://github.com/your-repo/booklens; your-email@example.com)'
         }
       });
+      endTimer();
+      externalApiRequests.inc({ service: "openlibrary", status: res.status });
 
       if (!res.data) {
         throw new ApiError(404, "Author not found");
@@ -254,6 +266,7 @@ class OpenLibraryService {
       logger.info("Author details fetched successfully", { authorId });
       return authorData;
     } catch (error) {
+      externalApiErrors.inc({ service: "openlibrary" });
       logger.error("Error fetching author details", {
         error: error.message,
         authorId,

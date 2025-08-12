@@ -29,4 +29,23 @@ router.put(
   UserController.updateUserPreferences
 );
 
+// GET /users/notification-preferences — get notification preferences
+router.get(
+  "/notification-preferences",
+  authMiddleware(),
+  UserController.getNotificationPreferences
+);
+// PUT /users/notification-preferences — update notification preferences
+router.put(
+  "/notification-preferences",
+  authMiddleware(),
+  UserController.updateNotificationPreferences
+);
+
+// GET /users/data-export — export user data (GDPR)
+router.get("/data-export", authMiddleware(), UserController.exportUserData);
+
+// DELETE /users/delete-account — delete account (GDPR)
+router.delete("/delete-account", authMiddleware(), UserController.deleteAccount);
+
 export default router;

@@ -36,10 +36,16 @@ class BookController {
 
   static async advancedSearch(req, res, next) {
     try {
+      // Check if user has pro subscription
+      if (req.user.subscriptionTier !== "pro") {
+        throw new ApiError(402, "Pro subscription required for advanced search");
+      }
+
       const { title, author, genre, page = 1 } = req.query;
       if (!title && !author && !genre) {
         throw new ApiError(400, "At least one search parameter is required");
       }
+      
       const result = await advancedSearchService.advancedSearch({
         title,
         author,

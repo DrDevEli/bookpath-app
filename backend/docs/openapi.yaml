@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: BookPath API
   version: 1.0.0
@@ -20,22 +20,107 @@ tags:
     description: Book discovery and metadata
   - name: Collections
     description: Book collection management
+  - name: Billing
+    description: Subscription and billing
+  - name: Metrics
+    description: Operational metrics (admin)
+  - name: SEO
+    description: SEO utility endpoints
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: |
+        JWT Bearer token authentication. Include the token in the Authorization header as:
+        `Authorization: Bearer <token>`
+
+        **Token Format:**
+        - Algorithm: HS256
+        - Issuer: BookPath API
+        - Audience: BookPath Users
+        - Expiration: 1 hour (configurable)
+        - Claims: sub (user ID), role, tokenVersion, jti (token ID)
+
+        **Token Validation:**
+        - Tokens are validated against a blacklist stored in Redis
+        - Token version must match user's current token version
+        - Account must not be locked
+
+        **Rate Limits:**
+        - Authenticated users: 300 requests/minute
+        - Admin users: 1000 requests/minute
+
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth 2.0 authentication flow using Google OAuth.
+
+        **Flow:**
+        1. Redirect user to `/auth/google` to initiate OAuth flow
+        2. User authenticates with Google
+        3. Google redirects to `/auth/google/callback`
+        4. API returns JWT tokens for authenticated session
+
+        **Scopes:**
+        - profile: Access to user's basic profile information
+        - email: Access to user's email address
+
+      flows:
+        authorizationCode:
+          authorizationUrl: https://accounts.google.com/o/oauth2/auth
+          tokenUrl: https://oauth2.googleapis.com/token
+          scopes:
+            profile: Access to basic profile information
+            email: Access to email address
+
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: |
+        CSRF protection token required for state-changing operations.
+
+        **Usage:**
+        1. Get CSRF token from `/auth/csrf-token` endpoint
+        2. Include token in `X-CSRF-Token` header for protected requests
+        3. Token is also set as httpOnly cookie for additional validation
+
+        **Security Features:**
+        - Cryptographically secure random generation
+        - 24-hour expiration
+        - HttpOnly cookie with secure and sameSite flags
+        - Required for all state-changing operations on protected endpoints
   schemas:
     ErrorResponse:
       type: object
+      required: [success, error]
       properties:
         success:
           type: boolean
           example: false
+          description: Always false for error responses
+        error:
+          type: string
+          example: "Validation failed"
+          description: Human-readable error message
         message:
           type: string
-          example: Error message
+          example: "Additional error details"
+          description: Optional additional error information
+        details:
+          type: object
+          additionalProperties: true
+          description: Optional object containing additional error details
+          example:
+            field: "email"
+            code: "INVALID_FORMAT"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+          example: "2024-01-01T12:00:00.000Z"
     Pagination:
       type: object
       properties:
@@ -95,9 +180,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/Book'
+            $ref: "#/components/schemas/Book"
         pagination:
-          $ref: '#/components/schemas/Pagination'
+          $ref: "#/components/schemas/Pagination"
         sources:
           type: object
           properties:
@@ -140,13 +225,747 @@ components:
         books:
           type: array
           items:
-            $ref: '#/components/schemas/Book'
+            $ref: "#/components/schemas/CollectionBook"
+        category:
+          type: string
+          enum:
+            [general, wishlist, favorites, currently-reading, completed, custom]
+          default: general
+        color:
+          type: string
+          pattern: "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+          default: "#3B82F6"
+        tags:
+          type: array
+          items:
+            type: string
+        user:
+          type: string
+          description: User ID who owns the collection
+        shareableLink:
+          type: string
+          nullable: true
+          description: Public shareable link for the collection
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CollectionBook:
+      type: object
+      required: [bookId, title]
+      properties:
+        bookId:
+          type: string
+          description: Unique identifier for the book
+          example: "OL123456M"
+        title:
+          type: string
+          description: Book title
+          example: "The Great Gatsby"
+        authors:
+          type: array
+          items:
+            type: string
+          description: List of book authors
+          example: ["F. Scott Fitzgerald"]
+        coverImage:
+          type: string
+          format: uri
+          nullable: true
+          description: URL to book cover image
+          example: "https://covers.openlibrary.org/b/id/123456-L.jpg"
+        publisher:
+          type: string
+          nullable: true
+          description: Book publisher
+          example: "Scribner"
+        publishedDate:
+          type: string
+          nullable: true
+          description: Publication date
+          example: "1925"
+        pageCount:
+          type: integer
+          nullable: true
+          description: Number of pages
+          example: 180
+        isbn:
+          type: string
+          nullable: true
+          description: ISBN number
+          example: "9780743273565"
+        language:
+          type: string
+          nullable: true
+          description: Book language
+          example: "en"
+        genres:
+          type: array
+          items:
+            type: string
+          description: Book genres/categories
+          example: ["Fiction", "Classic Literature"]
+        addedAt:
+          type: string
+          format: date-time
+          description: When the book was added to the collection
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Personal notes about the book
+          example: "Great character development"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: Personal rating (1-5 stars)
+          example: 4
+        readStatus:
+          type: string
+          enum: [to-read, reading, completed, abandoned, dnf]
+          default: to-read
+          description: Current reading status
+          example: "completed"
+        dateStarted:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date when started reading
+        dateFinished:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date when finished reading
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Reading progress percentage
+          example: 75
+        favorite:
+          type: boolean
+          default: false
+          description: Whether this book is marked as favorite
+          example: true
+        personalTags:
+          type: array
+          items:
+            type: string
+          description: Personal tags for the book
+          example: ["must-read", "book-club"]
+
+    AddBookToCollectionRequest:
+      type: object
+      required: [bookId, title]
+      properties:
+        bookId:
+          type: string
+          description: Unique identifier for the book
+          example: "OL123456M"
+        title:
+          type: string
+          description: Book title
+          example: "The Great Gatsby"
+        authors:
+          type: array
+          items:
+            type: string
+          description: List of book authors
+          example: ["F. Scott Fitzgerald"]
+        coverImage:
+          type: string
+          format: uri
+          nullable: true
+          description: URL to book cover image
+        publisher:
+          type: string
+          nullable: true
+          description: Book publisher
+        publishedDate:
+          type: string
+          nullable: true
+          description: Publication date
+        pageCount:
+          type: integer
+          nullable: true
+          description: Number of pages
+        isbn:
+          type: string
+          nullable: true
+          description: ISBN number
+        language:
+          type: string
+          nullable: true
+          description: Book language
+        genres:
+          type: array
+          items:
+            type: string
+          description: Book genres/categories
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Personal notes about the book
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: Personal rating (1-5 stars)
+        readStatus:
+          type: string
+          enum: [to-read, reading, completed, abandoned, dnf]
+          default: to-read
+          description: Current reading status
+        dateStarted:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date when started reading
+        dateFinished:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date when finished reading
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Reading progress percentage
+        favorite:
+          type: boolean
+          default: false
+          description: Whether this book is marked as favorite
+        personalTags:
+          type: array
+          items:
+            type: string
+          description: Personal tags for the book
+
+    UpdateBookInCollectionRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Personal notes about the book
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: Personal rating (1-5 stars)
+        readStatus:
+          type: string
+          enum: [to-read, reading, completed, abandoned, dnf]
+          description: Current reading status
+        dateStarted:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date when started reading
+        dateFinished:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date when finished reading
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Reading progress percentage
+        favorite:
+          type: boolean
+          description: Whether this book is marked as favorite
+        personalTags:
+          type: array
+          items:
+            type: string
+          description: Personal tags for the book
+
+    TwoFactorSetupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        qrCode:
+          type: string
+          description: Base64 encoded QR code image for authenticator app setup
+        secret:
+          type: string
+          description: Secret key for manual entry into authenticator app
+        backupCodes:
+          type: array
+          items:
+            type: string
+          description: One-time backup codes for account recovery
+
+    TwoFactorVerifyRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: "^[0-9]{6}$"
+          description: 6-digit code from authenticator app
+          example: "123456"
+
+    UserProfile:
+      type: object
+      required:
+        [
+          id,
+          username,
+          email,
+          role,
+          emailVerified,
+          twoFactorEnabled,
+          subscriptionTier,
+        ]
+      properties:
+        id:
+          type: string
+          description: Unique user identifier
+          example: "507f1f77bcf86cd799439011"
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[a-zA-Z0-9_]+$"
+          description: Unique username (3-30 characters, alphanumeric and underscores only)
+          example: "johndoe"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "john@example.com"
+        role:
+          type: string
+          enum: [user, chefaodacasa]
+          description: User role (user for regular users, chefaodacasa for admin)
+          example: "user"
+        emailVerified:
+          type: boolean
+          description: Whether the user's email address has been verified
+          example: true
+        twoFactorEnabled:
+          type: boolean
+          description: Whether two-factor authentication is enabled
+          example: false
+        subscriptionTier:
+          type: string
+          enum: [free, pro]
+          description: User's subscription tier
+          example: "free"
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
+        emailNotifications:
+          type: object
+          description: Email notification preferences
+          properties:
+            marketing:
+              type: boolean
+              default: false
+              description: Receive marketing emails
+              example: false
+            productUpdates:
+              type: boolean
+              default: true
+              description: Receive product update notifications
+              example: true
+            securityAlerts:
+              type: boolean
+              default: true
+              description: Receive security alert notifications
+              example: true
+            collectionShares:
+              type: boolean
+              default: true
+              description: Receive notifications when collections are shared
+              example: true
+        stripeCustomerId:
+          type: string
+          nullable: true
+          description: Stripe customer ID for billing
+          example: "cus_1234567890"
+        stripeSubscriptionId:
+          type: string
+          nullable: true
+          description: Stripe subscription ID for pro users
+          example: "sub_1234567890"
+        tokenVersion:
+          type: integer
+          description: Version number for JWT token invalidation
+          example: 1
+        failedLoginAttempts:
+          type: integer
+          description: Number of consecutive failed login attempts
+          example: 0
+        accountLockedUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp until which the account is locked
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: "2024-01-01T12:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last account update timestamp
+          example: "2024-01-01T12:00:00.000Z"
+
+    UserPreferences:
+      type: object
+      description: User application preferences and settings
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, auto]
+          default: light
+          description: UI theme preference
+          example: "dark"
+        language:
+          type: string
+          default: en
+          description: Preferred language code (ISO 639-1)
+          example: "en"
+        booksPerPage:
+          type: integer
+          minimum: 5
+          maximum: 100
+          default: 10
+          description: Number of books to display per page in search results
+          example: 20
+        defaultSearchType:
+          type: string
+          enum: [title, author, isbn, subject]
+          default: title
+          description: Default search type for book searches
+          example: "author"
+      additionalProperties: true
+      example:
+        theme: "dark"
+        language: "en"
+        booksPerPage: 20
+        defaultSearchType: "author"
+
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+          description: Overall system health status
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of health check
+        mongodb:
+          type: string
+          enum: [connected, disconnected]
+          description: MongoDB connection status
+        redis:
+          type: string
+          enum: [connected, disconnected]
+          description: Redis connection status
+        environment:
+          type: string
+          description: Current environment (development, production, etc.)
+        uptime:
+          type: number
+          description: Server uptime in seconds
+
+    RateLimitHeaders:
+      type: object
+      description: Rate limiting information returned in response headers
+      properties:
+        X-RateLimit-Limit:
+          type: integer
+          description: Maximum number of requests allowed in the time window
+        X-RateLimit-Remaining:
+          type: integer
+          description: Number of requests remaining in the current time window
+        X-RateLimit-Reset:
+          type: integer
+          description: Time in seconds until the rate limit resets
+        Retry-After:
+          type: integer
+          description: Time in seconds to wait before making another request (only present when rate limited)
+
+# Security Documentation
+x-security-documentation:
+  authentication:
+    description: |
+      BookPath API uses multiple authentication methods depending on the endpoint and use case.
+
+    methods:
+      jwt:
+        description: |
+          Primary authentication method using JSON Web Tokens (JWT).
+
+          **Token Structure:**
+          - Header: `{"alg": "HS256", "typ": "JWT"}`
+          - Payload: `{"sub": "userId", "role": "user|chefaodacasa", "tokenVersion": 1, "jti": "tokenId", "iat": timestamp, "exp": timestamp}`
+          - Signature: HMAC SHA256 using JWT_SECRET
+
+          **Token Lifecycle:**
+          - Access tokens expire in 1 hour (configurable)
+          - Refresh tokens expire in 7 days (configurable)
+          - Tokens can be revoked by adding to Redis blacklist
+          - Token version increments on security events (password change, etc.)
+
+          **Usage:**
+          ```
+          Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          ```
+
+      oauth2:
+        description: |
+          OAuth 2.0 integration with Google for social authentication.
+
+          **Flow:**
+          1. Client redirects to `/auth/google`
+          2. User authenticates with Google
+          3. Google redirects to `/auth/google/callback`
+          4. Server generates JWT tokens and redirects to frontend
+
+          **Required Scopes:**
+          - `profile`: Basic profile information
+          - `email`: Email address
+
+      twoFactor:
+        description: |
+          Time-based One-Time Password (TOTP) two-factor authentication.
+
+          **Setup Process:**
+          1. User calls `/auth/2fa/setup` (authenticated)
+          2. Server returns QR code and secret
+          3. User scans QR code with authenticator app
+          4. User calls `/auth/2fa/verify` with TOTP code
+          5. 2FA is enabled and backup codes are provided
+
+          **Login Process:**
+          1. User provides email/password
+          2. If 2FA enabled, server returns `requiresTwoFactor: true`
+          3. User calls `/auth/2fa/login` with TOTP code
+          4. Server returns JWT tokens
+
+  authorization:
+    description: |
+      Role-based access control with the following roles:
+
+    roles:
+      user:
+        description: Regular authenticated user
+        permissions:
+          - Access personal data and collections
+          - Create and manage own collections (up to 5 for free tier)
+          - Search books with basic features
+          - Update profile and preferences
+
+      chefaodacasa:
+        description: Administrator role with elevated privileges
+        permissions:
+          - All user permissions
+          - Access system metrics and health endpoints
+          - Higher rate limits (1000 requests/minute vs 300)
+          - Access to operational endpoints
+
+    subscriptionTiers:
+      free:
+        description: Free tier with limited features
+        limits:
+          - Maximum 5 collections
+          - Basic book search only
+          - Standard rate limits
+
+      pro:
+        description: Pro subscription with enhanced features
+        limits:
+          - Unlimited collections
+          - Advanced search capabilities
+          - Enhanced rate limits
+          - Priority support
+
+  rateLimiting:
+    description: |
+      Rate limiting is implemented using Redis-backed sliding window counters.
+
+    limits:
+      anonymous:
+        requests: 100
+        window: "1 minute"
+        description: "Unauthenticated requests"
+
+      authenticated:
+        requests: 300
+        window: "1 minute"
+        description: "Authenticated users"
+
+      admin:
+        requests: 1000
+        window: "1 minute"
+        description: "Admin users (chefaodacasa role)"
+
+      login:
+        requests: 5
+        window: "15 minutes"
+        blockDuration: "30 minutes"
+        description: "Login attempts (per IP)"
+
+    headers:
+      description: |
+        Rate limit information is returned in response headers:
+        - `X-RateLimit-Limit`: Maximum requests allowed
+        - `X-RateLimit-Remaining`: Requests remaining in window
+        - `X-RateLimit-Reset`: Seconds until window resets
+        - `Retry-After`: Seconds to wait when rate limited (429 responses only)
+
+  cors:
+    description: |
+      Cross-Origin Resource Sharing (CORS) configuration.
+
+    production:
+      origins:
+        - "https://www.bookpath.eu"
+        - "https://bookpath.eu"
+        - "https://api.bookpath.eu"
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+      headers: ["Content-Type", "Authorization", "X-CSRF-Token"]
+      credentials: true
+      maxAge: 86400
+
+    development:
+      origins: ["http://localhost:3000"]
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+      headers: ["Content-Type", "Authorization", "X-CSRF-Token"]
+      credentials: true
+      maxAge: 86400
+
+  csrf:
+    description: |
+      Cross-Site Request Forgery (CSRF) protection for state-changing operations.
+
+    implementation:
+      - CSRF tokens are generated using cryptographically secure random bytes
+      - Tokens are set as httpOnly cookies with secure and sameSite flags
+      - Tokens must be included in `X-CSRF-Token` header for protected requests
+      - Tokens expire after 24 hours
+      - Double-submit cookie pattern for validation
+
+    usage:
+      description: |
+        1. GET `/auth/csrf-token` to obtain a token
+        2. Include token in `X-CSRF-Token` header for subsequent requests
+        3. Token is automatically validated against the httpOnly cookie
+
+  endpointClassification:
+    description: |
+      Endpoints are classified by their authentication and authorization requirements.
+
+    public:
+      description: "No authentication required"
+      endpoints:
+        - "GET /health"
+        - "GET /books/search"
+        - "GET /books/{id}"
+        - "GET /books/author/{authorId}"
+        - "POST /auth/register"
+        - "POST /auth/login"
+        - "POST /auth/request-password-reset"
+        - "POST /auth/reset-password"
+        - "GET /auth/verify-email/{token}"
+        - "POST /auth/resend-verification-public"
+        - "GET /auth/csrf-token"
+        - "GET /auth/google"
+        - "GET /auth/google/callback"
+        - "POST /auth/2fa/login"
+        - "GET /auth/validate-reset-token/{token}"
+        - "POST /billing/webhook"
+        - "GET /seo/collections/{shareableLink}"
+
+    protected:
+      description: "Requires valid JWT authentication"
+      endpoints:
+        - "POST /auth/logout"
+        - "POST /auth/logout/all"
+        - "POST /auth/refresh-token"
+        - "POST /auth/2fa/setup"
+        - "POST /auth/2fa/verify"
+        - "POST /auth/2fa/disable"
+        - "POST /auth/resend-verification"
+        - "GET /books/search/advanced"
+        - "GET /users/profile"
+        - "PUT /users/profile"
+        - "PUT /users/password"
+        - "GET /users/preferences"
+        - "PUT /users/preferences"
+        - "GET /users/notification-preferences"
+        - "PUT /users/notification-preferences"
+        - "GET /users/data-export"
+        - "DELETE /users/delete-account"
+        - "GET /collections"
+        - "POST /collections"
+        - "GET /collections/{id}"
+        - "PUT /collections/{id}"
+        - "DELETE /collections/{id}"
+        - "POST /collections/{id}/books"
+        - "PUT /collections/{id}/books/{bookId}"
+        - "DELETE /collections/{id}/books/{bookId}"
+        - "GET /collections/by-category/{category}"
+        - "POST /collections/{id}/share"
+        - "GET /collections/{id}/stats"
+        - "GET /collections/{id}/search"
+        - "GET /collections/shared/{shareableLink}"
+        - "POST /billing/checkout"
+        - "POST /billing/portal"
+
+    adminOnly:
+      description: "Requires admin role (chefaodacasa)"
+      endpoints:
+        - "GET /metrics"
+        - "GET /api/chefaodacasa/cache/stats"
+        - "POST /api/chefaodacasa/cache/reset"
+
+    proOnly:
+      description: "Requires pro subscription tier"
+      endpoints:
+        - "GET /books/search/advanced"
+
 paths:
   /auth/register:
     post:
       operationId: authRegister
       tags: [Auth]
       summary: Register a new user
+      description: |
+        Create a new user account with email and password.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Rate limited: 100 requests/minute for anonymous users
+        - Email verification required after registration
+
+        **Validation:**
+        - Username: 3-30 characters, alphanumeric and underscores only
+        - Email: Valid email format, must be unique
+        - Password: Minimum 6 characters (matches actual validation)
       requestBody:
         required: true
         content:
@@ -157,28 +976,153 @@ paths:
               properties:
                 username:
                   type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: "^[a-zA-Z0-9_]+$"
+                  example: "johndoe"
+                  description: "Alphanumeric characters and underscores only"
                 email:
                   type: string
                   format: email
+                  example: "john@example.com"
+                  description: "Must be a valid email address and unique"
                 password:
                   type: string
                   format: password
+                  minLength: 6
+                  example: "mypassword123"
+                  description: "Minimum 6 characters"
       responses:
-        '201':
-          description: Created
-        '400':
-          description: Bad request
+        "201":
+          description: User registered successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Conflict
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Registration successful. Please verify your email."
+        "400":
+          description: Validation error or invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validation_error:
+                  summary: Validation error
+                  value:
+                    success: false
+                    error: "Validation error"
+                    details:
+                      - field: "username"
+                        message: "Username must be between 3 and 30 characters"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                missing_fields:
+                  summary: Missing required fields
+                  value:
+                    success: false
+                    error: "Username, email and password are required"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "409":
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "User with this email or username already exists"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Too many requests. Please try again later."
+                timestamp: "2024-01-01T12:00:00.000Z"
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              description: Request limit per time window
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Requests remaining in current window
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              description: Time until rate limit resets (seconds)
+            Retry-After:
+              schema:
+                type: integer
+              description: Time to wait before making another request (seconds)
+        "400":
+          description: Bad request - validation errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validation_error:
+                  summary: Validation error
+                  value:
+                    success: false
+                    message: "Validation failed"
+                    error: "Password must contain at least one uppercase letter"
+        "409":
+          description: Conflict - user already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                user_exists:
+                  summary: User already exists
+                  value:
+                    success: false
+                    message: "User with this email already exists"
+        "429":
+          description: Too many requests
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /auth/login:
     post:
       operationId: authLogin
       tags: [Auth]
       summary: Login user
+      description: |
+        Authenticate user with email and password.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Rate limited: 5 attempts per 15 minutes per IP
+        - Account locked after 5 failed attempts for 30 minutes
+        - Returns JWT tokens for authenticated session
+
+        **Two-Factor Authentication:**
+        - If 2FA is enabled, returns `requiresTwoFactor: true` with `userId`
+        - Client must then call `/auth/2fa/login` with TOTP code
+
+        **Response:**
+        - Access token (1 hour expiration)
+        - Refresh token (7 days expiration)
+        - User profile information
       requestBody:
         required: true
         content:
@@ -190,26 +1134,919 @@ paths:
                 email:
                   type: string
                   format: email
+                  example: "john@example.com"
+                  description: "User's email address"
                 password:
                   type: string
                   format: password
+                  example: "mypassword123"
+                  description: "User's password"
       responses:
-        '200':
-          description: OK
-        '401':
-          description: Unauthorized
+        "200":
+          description: Login successful or 2FA required
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    description: "Standard login success"
+                    properties:
+                      success:
+                        type: boolean
+                        example: true
+                      accessToken:
+                        type: string
+                        description: "JWT access token (1 hour expiration)"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refreshToken:
+                        type: string
+                        description: "JWT refresh token (7 days expiration)"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: "507f1f77bcf86cd799439011"
+                          username:
+                            type: string
+                            example: "johndoe"
+                          email:
+                            type: string
+                            example: "john@example.com"
+                          role:
+                            type: string
+                            example: "user"
+                  - type: object
+                    description: "2FA required response"
+                    properties:
+                      success:
+                        type: boolean
+                        example: true
+                      requiresTwoFactor:
+                        type: boolean
+                        example: true
+                      userId:
+                        type: string
+                        example: "507f1f77bcf86cd799439011"
+                        description: "User ID needed for 2FA verification"
+        "400":
+          description: Bad request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Email and password are required"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Invalid credentials"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "403":
+          description: Forbidden - account locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Account is locked. Try again later."
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "429":
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Too many login attempts. Try again later."
+                timestamp: "2024-01-01T12:00:00.000Z"
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              description: Request limit per time window
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Requests remaining in current window
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              description: Time until rate limit resets (seconds)
+            Retry-After:
+              schema:
+                type: integer
+              description: Time to wait before making another request (seconds)
+                invalid_credentials:
+                  summary: Invalid credentials
+                  value:
+                    success: false
+                account_locked:
+                  summary: Account locked
+                  value:
+                    success: false
+                    message: "Too many attempts. Account locked until 2024-01-01T12:00:00Z"
+        "429":
+          description: Too many login attempts
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /auth/logout:
     post:
       operationId: authLogout
       tags: [Auth]
       summary: Logout user
+      description: |
+        Logout the current user session by blacklisting the JWT token.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Token is added to Redis blacklist
+        - Invalidates only the current session
+
+        **Note:** Use `/auth/logout/all` to logout from all sessions.
       security:
         - bearerAuth: []
       responses:
-        '200':
-          description: OK
-        '401':
-          description: Unauthorized
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logout successful"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout/all:
+    post:
+      operationId: authLogoutAll
+      tags: [Auth]
+      summary: Logout from all sessions
+      description: |
+        Logout the user from all active sessions by incrementing the token version.
+        This invalidates all existing JWT tokens for the user.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Increments user's token version in database
+        - Invalidates all existing tokens immediately
+
+        **Use Cases:**
+        - Security breach response
+        - Password change
+        - Suspicious activity detected
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out from all sessions successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out from all sessions successfully"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/csrf-token:
+    get:
+      operationId: authGetCsrfToken
+      tags: [Auth]
+      summary: Get CSRF token
+      description: |
+        Generate and return a CSRF token for protecting state-changing operations.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Token is set as httpOnly cookie
+        - Token expires after 24 hours
+        - Uses cryptographically secure random generation
+
+        **Usage:**
+        1. Call this endpoint to get a CSRF token
+        2. Include the token in `X-CSRF-Token` header for protected requests
+        3. Token is automatically validated against the httpOnly cookie
+      responses:
+        "200":
+          description: CSRF token generated successfully
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: "HttpOnly CSRF token cookie"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  csrfToken:
+                    type: string
+                    example: "a1b2c3d4e5f6..."
+                    description: "CSRF token to include in X-CSRF-Token header"
+
+  /auth/google:
+    get:
+      operationId: authGoogleInitiate
+      tags: [Auth]
+      summary: Initiate Google OAuth flow
+      description: |
+        Redirect user to Google OAuth authorization page.
+
+        **OAuth Flow:**
+        1. User is redirected to Google's authorization server
+        2. User authenticates with Google
+        3. Google redirects back to `/auth/google/callback`
+        4. Server processes the callback and generates JWT tokens
+
+        **Scopes Requested:**
+        - `profile`: Basic profile information
+        - `email`: Email address
+      responses:
+        "302":
+          description: Redirect to Google OAuth authorization page
+          headers:
+            Location:
+              schema:
+                type: string
+              description: "Google OAuth authorization URL"
+
+  /auth/google/callback:
+    get:
+      operationId: authGoogleCallback
+      tags: [Auth]
+      summary: Google OAuth callback
+      description: |
+        Handle Google OAuth callback and complete authentication.
+
+        **Process:**
+        1. Receives authorization code from Google
+        2. Exchanges code for user profile information
+        3. Creates or updates user account
+        4. Generates JWT tokens
+        5. Redirects to frontend with tokens
+
+        **Note:** This endpoint is called by Google, not directly by clients.
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema:
+            type: string
+          description: "Authorization code from Google"
+        - in: query
+          name: state
+          schema:
+            type: string
+          description: "State parameter for CSRF protection"
+      responses:
+        "302":
+          description: Redirect to frontend with authentication tokens
+          headers:
+            Location:
+              schema:
+                type: string
+              description: "Frontend URL with JWT tokens as query parameters"
+        "400":
+          description: Invalid authorization code or state
+
+  /auth/2fa/setup:
+    post:
+      operationId: authTwoFactorSetup
+      tags: [Auth]
+      summary: Setup two-factor authentication
+      description: |
+        Initialize two-factor authentication for the user account.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Generates TOTP secret and QR code
+        - Provides backup codes for account recovery
+
+        **Process:**
+        1. Server generates TOTP secret
+        2. Returns QR code for authenticator app setup
+        3. User scans QR code or manually enters secret
+        4. User calls `/auth/2fa/verify` to complete setup
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 2FA setup initiated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      secret:
+                        type: string
+                        description: "Base32 encoded TOTP secret for manual entry"
+                        example: "JBSWY3DPEHPK3PXP"
+                      qrCode:
+                        type: string
+                        description: "Base64 encoded QR code image data URL"
+                        example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+                      recoveryCodes:
+                        type: array
+                        items:
+                          type: string
+                        description: "One-time backup codes for account recovery"
+                        example: ["A1B2C3D4E5", "F6G7H8I9J0", "K1L2M3N4O5", "P6Q7R8S9T0", "U1V2W3X4Y5"]
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "500":
+          description: Internal server error - 2FA setup failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/2fa/verify:
+    post:
+      operationId: authTwoFactorVerify
+      tags: [Auth]
+      summary: Verify and enable two-factor authentication
+      description: |
+        Complete two-factor authentication setup by verifying TOTP code.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Validates TOTP code against generated secret
+        - Enables 2FA on successful verification
+
+        **Process:**
+        1. User enters 6-digit code from authenticator app
+        2. Server validates code against TOTP secret
+        3. 2FA is enabled for the account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwoFactorVerifyRequest"
+            examples:
+              verify_code:
+                summary: Verify TOTP code
+                value:
+                  token: "123456"
+      responses:
+        "200":
+          description: 2FA enabled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Two-factor authentication enabled"
+        "400":
+          description: Bad request - invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_token:
+                  summary: Invalid verification code
+                  value:
+                    success: false
+                    error: "Invalid verification code"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                missing_token:
+                  summary: Missing token
+                  value:
+                    success: false
+                    error: "Verification code and user ID are required"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "User not found"
+                timestamp: "2024-01-01T12:00:00.000Z"
+                    example: true
+                  message:
+                    type: string
+                    example: "Two-factor authentication enabled successfully"
+                  backupCodes:
+                    type: array
+                    items:
+                      type: string
+                    description: "One-time backup codes for account recovery"
+        "400":
+          description: Invalid TOTP code or 2FA already enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/2fa/login:
+    post:
+      operationId: authTwoFactorLogin
+      tags: [Auth]
+      summary: Complete login with two-factor authentication
+      description: |
+        Complete the login process for users with 2FA enabled.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Requires valid TOTP code
+        - Rate limited: 5 attempts per 15 minutes per user
+
+        **Process:**
+        1. User first calls `/auth/login` with email/password
+        2. If 2FA is enabled, server returns `requiresTwoFactor: true` with `userId`
+        3. User calls this endpoint with userId and TOTP code
+        4. Server validates code and returns JWT tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, token]
+              properties:
+                userId:
+                  type: string
+                  description: "User ID returned from initial login attempt"
+                  example: "507f1f77bcf86cd799439011"
+                token:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  pattern: "^[0-9]{6}$"
+                  description: "6-digit TOTP code from authenticator app"
+                  example: "123456"
+            examples:
+              totp_login:
+                summary: Login with TOTP code
+                value:
+                  userId: "507f1f77bcf86cd799439011"
+                  token: "123456"
+      responses:
+        "200":
+          description: 2FA login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  accessToken:
+                    type: string
+                    description: "JWT access token (1 hour expiration)"
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refreshToken:
+                    type: string
+                    description: "JWT refresh token (7 days expiration)"
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "507f1f77bcf86cd799439011"
+                      username:
+                        type: string
+                        example: "johndoe"
+                      email:
+                        type: string
+                        example: "john@example.com"
+                      role:
+                        type: string
+                        example: "user"
+        "400":
+          description: Bad request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Verification code and user ID are required"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid TOTP code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Invalid verification code"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "User not found"
+                timestamp: "2024-01-01T12:00:00.000Z"
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many 2FA attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/2fa/disable:
+    post:
+      operationId: authTwoFactorDisable
+      tags: [Auth]
+      summary: Disable two-factor authentication
+      description: |
+        Disable two-factor authentication for the user account.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Requires current password confirmation
+        - Invalidates all existing backup codes
+
+        **Process:**
+        1. User provides current password for verification
+        2. Server validates password
+        3. 2FA is disabled for the account
+        4. All backup codes are invalidated
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  format: password
+                  description: "Current account password for verification"
+      responses:
+        "200":
+          description: 2FA disabled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Two-factor authentication disabled successfully"
+        "400":
+          description: Invalid password or 2FA not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: authForgotPassword
+      tags: [Auth]
+      summary: Request password reset (alternative endpoint)
+      description: |
+        Alternative endpoint for requesting password reset email.
+        Identical functionality to `/auth/request-password-reset`.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Rate limited: 3 requests per 15 minutes per IP
+        - Email is sent only if account exists (no user enumeration)
+
+        **Process:**
+        1. User provides email address
+        2. If account exists, password reset email is sent
+        3. Email contains secure token with 1-hour expiration
+        4. User clicks link to reset password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+      responses:
+        "200":
+          description: Password reset email sent (if account exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "If your email is registered, you will receive a password reset link"
+        "429":
+          description: Too many password reset requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/validate-reset-token/{token}:
+    get:
+      operationId: authValidateResetToken
+      tags: [Auth]
+      summary: Validate password reset token
+      description: |
+        Validate if a password reset token is valid and not expired.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Token validation without revealing user information
+        - Tokens expire after 1 hour
+
+        **Usage:**
+        - Frontend can check token validity before showing reset form
+        - Prevents user from entering new password with invalid token
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+          description: "Password reset token from email"
+      responses:
+        "200":
+          description: Token validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  isValid:
+                    type: boolean
+                    example: true
+                    description: "Whether the token is valid and not expired"
+        "400":
+          description: Invalid token format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/resend-verification:
+    post:
+      operationId: authResendVerification
+      tags: [Auth]
+      summary: Resend email verification (authenticated)
+      description: |
+        Resend email verification for authenticated users.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Rate limited: 3 requests per 15 minutes per user
+        - Only works if email is not already verified
+
+        **Usage:**
+        - For logged-in users who need to re-verify their email
+        - Generates new verification token
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Verification email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Verification email sent successfully"
+        "400":
+          description: Email already verified or other error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many resend attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/resend-verification-public:
+    post:
+      operationId: authResendVerificationPublic
+      tags: [Auth]
+      summary: Resend email verification (public)
+      description: |
+        Resend email verification for users who are not logged in.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Rate limited: 3 requests per 15 minutes per IP
+        - No user enumeration (same response regardless of email existence)
+
+        **Usage:**
+        - For users who registered but lost verification email
+        - Requires email address to identify account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+      responses:
+        "200":
+          description: Verification email sent (if account exists and unverified)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "If your email is registered and not verified, a verification email has been sent"
+        "429":
+          description: Too many resend attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: authRefresh
+      tags: [Auth]
+      summary: Refresh JWT token (alternative endpoint)
+      description: |
+        Alternative endpoint for refreshing JWT tokens.
+        Identical functionality to `/auth/refresh-token`.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Requires valid refresh token
+        - Refresh tokens expire after 7 days
+
+        **Process:**
+        1. Client provides refresh token
+        2. Server validates refresh token
+        3. New access and refresh tokens are generated
+        4. Old refresh token is invalidated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  description: "Valid refresh token"
+      responses:
+        "200":
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                        description: "New JWT access token"
+                      refreshToken:
+                        type: string
+                        description: "New JWT refresh token"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /auth/refresh-token:
     post:
       operationId: authRefreshToken
@@ -226,74 +2063,622 @@ paths:
                 refreshToken:
                   type: string
       responses:
-        '200':
+        "200":
           description: OK
-        '401':
+        "401":
           description: Unauthorized
+  /health:
+    get:
+      operationId: healthCheck
+      tags: [System]
+      summary: System health check
+      description: |
+        Check the health status of the API and its dependencies.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - No rate limiting applied
+
+        **Checks:**
+        - MongoDB connection status
+        - Redis connection status
+        - Server uptime
+        - Environment information
+
+        **Usage:**
+        - Load balancer health checks
+        - Monitoring systems
+        - Service discovery
+      responses:
+        "200":
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheckResponse"
+              example:
+                status: "ok"
+                timestamp: "2024-01-01T12:00:00.000Z"
+                mongodb: "connected"
+                redis: "connected"
+                environment: "production"
+                uptime: 86400
+        "500":
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheckResponse"
+              example:
+                status: "error"
+                timestamp: "2024-01-01T12:00:00.000Z"
+                mongodb: "disconnected"
+                redis: "connected"
+                environment: "production"
+                uptime: 86400
+
   /books/search:
     get:
       operationId: booksSearch
       tags: [Books]
       summary: Search for books across multiple sources
+      description: |
+        Search for books using multiple external APIs and data sources.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Rate limited: 100 requests/minute for anonymous users
+
+        **Data Sources:**
+        - Google Books API
+        - Open Library API
+        - Gutendex (Project Gutenberg)
+        - BookLooker (used books)
+
+        **Features:**
+        - Unified search across multiple sources
+        - Automatic deduplication
+        - Category normalization
+        - Pagination support
+        - Sorting options
+        - Results cached for 1 hour
+
+        **Requirements:**
+        - At least one of "title" or "author" is required
       parameters:
         - in: query
           name: title
-          schema: { type: string }
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          description: "Book title to search for (required if author not provided)"
+          example: "The Great Gatsby"
         - in: query
           name: author
-          schema: { type: string }
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: "Author name to search for (required if title not provided)"
+          example: "F. Scott Fitzgerald"
         - in: query
           name: page
-          schema: { type: integer, default: 1, minimum: 1 }
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: "Page number for pagination"
         - in: query
           name: category
-          schema: { type: string }
+          schema:
+            type: string
+          description: "Book category filter"
+          example: "Fiction"
         - in: query
           name: condition
-          schema: { type: string, enum: [new, used] }
+          schema:
+            type: string
+          description: "Book condition filter"
+          example: "new"
         - in: query
           name: sort
-          schema: { type: string, enum: [newest, author_az] }
+          schema:
+            type: string
+          description: "Sort order for results"
+          example: "relevance"
       responses:
-        '200':
-          description: OK
+        "200":
+          description: Search completed successfully
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              description: "Maximum requests allowed per minute"
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: "Requests remaining in current window"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BookSearchResponse'
-        '400':
-          description: Bad request
+                $ref: "#/components/schemas/BookSearchResponse"
+              example:
+                success: true
+                data:
+                  - id: "google_books_123"
+                    title: "The Great Gatsby"
+                    authors: ["F. Scott Fitzgerald"]
+                    description: "A classic American novel..."
+                    coverImage: "https://example.com/cover.jpg"
+                    firstPublishYear: 1925
+                    subjects: ["Fiction", "American Literature"]
+                    category: "Fiction"
+                    condition: "new"
+                    amazonLink: "https://amazon.com/..."
+                pagination:
+                  currentPage: 1
+                  totalPages: 5
+                  totalResults: 47
+                  hasNextPage: true
+                  hasPreviousPage: false
+                sources:
+                  openLibrary: true
+                  gutendex: false
+                  googleBooks: true
+                  booklooker: true
+                errors: null
+        "400":
+          description: Bad request - invalid parameters or missing required fields
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_query:
+                  summary: Missing required search parameters
+                  value:
+                    success: false
+                    error: "At least one of \"title\" or \"author\" is required"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "429":
+          description: Too many requests
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: "Seconds to wait before retrying"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /books/search/advanced:
     get:
       operationId: booksAdvancedSearch
       tags: [Books]
-      summary: Advanced book search
+      summary: Advanced book search (Pro only)
+      description: |
+        Advanced book search with enhanced filtering and AI-powered recommendations.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Requires Pro subscription tier
+        - Rate limited: 300 requests/minute for authenticated users
+
+        **Requirements:**
+        - At least one search parameter (title, author, or genre) is required
+        - User must have active Pro subscription
+
+        **Features:**
+        - Enhanced search algorithms
+        - AI-powered recommendations
+        - Advanced filtering options
+        - Priority processing
+      security:
+        - bearerAuth: []
       parameters:
         - in: query
           name: title
-          schema: { type: string }
+          schema:
+            type: string
+          description: "Book title to search for"
+          example: "The Great Gatsby"
         - in: query
           name: author
-          schema: { type: string }
+          schema:
+            type: string
+          description: "Author name to search for"
+          example: "F. Scott Fitzgerald"
         - in: query
           name: genre
-          schema: { type: string }
+          schema:
+            type: string
+          description: "Genre to search for"
+          example: "Fiction"
         - in: query
           name: page
-          schema: { type: integer, default: 1, minimum: 1 }
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: "Page number for pagination"
       responses:
-        '200':
-          description: OK
+        "200":
+          description: Advanced search completed successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BookSearchResponse'
-        '400':
-          description: Bad request
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Bad request - missing search parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "At least one search parameter is required"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "402":
+          description: Payment required - Pro subscription required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Pro subscription required for advanced search"
+                timestamp: "2024-01-01T12:00:00.000Z"
+
+        **Enhanced Features:**
+        - AI-powered book recommendations
+        - Advanced genre filtering
+        - Publication date ranges
+        - Language filtering
+        - Reading level filtering
+        - Enhanced sorting options
+
+        **Pro Subscription Required:**
+        This endpoint requires an active Pro subscription. Free tier users will receive a 402 Payment Required response.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: title
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          description: "Book title to search for"
+        - in: query
+          name: author
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: "Author name to search for"
+        - in: query
+          name: genre
+          schema:
+            type: string
+            enum:
+              [
+                Fiction,
+                Non-Fiction,
+                Sci-Fi,
+                Fantasy,
+                Mystery,
+                Romance,
+                Biography,
+                History,
+                Science,
+                Technology,
+                Philosophy,
+                Poetry,
+                Drama,
+                Children,
+                Young-Adult,
+              ]
+          description: "Specific genre filter (more granular than category)"
+        - in: query
+          name: publishedAfter
+          schema:
+            type: integer
+            minimum: 1000
+            maximum: 2024
+          description: "Books published after this year"
+        - in: query
+          name: publishedBefore
+          schema:
+            type: integer
+            minimum: 1000
+            maximum: 2024
+          description: "Books published before this year"
+        - in: query
+          name: language
+          schema:
+            type: string
+            enum: [en, es, fr, de, it, pt, ru, zh, ja, ko]
+          description: "Book language filter"
+        - in: query
+          name: readingLevel
+          schema:
+            type: string
+            enum: [elementary, middle-grade, young-adult, adult]
+          description: "Target reading level"
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+            maximum: 100
+          description: "Page number for pagination"
+        - in: query
+          name: aiRecommendations
+          schema:
+            type: boolean
+            default: false
+          description: "Include AI-powered recommendations based on search"
+      responses:
+        "200":
+          description: Advanced search completed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/BookSearchResponse"
+                  - type: object
+                    properties:
+                      aiRecommendations:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Book"
+                        description: "AI-powered book recommendations (if requested)"
+        "400":
+          description: Bad request - invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "402":
+          description: Payment Required - Pro subscription needed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: "This feature requires a Pro subscription"
+                error: "SUBSCRIPTION_REQUIRED"
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [System]
+      summary: Prometheus metrics (Admin only)
+      description: |
+        Get Prometheus-formatted metrics for monitoring and observability.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Requires admin role (chefaodacasa)
+        - Rate limited: 1000 requests/minute for admin users
+
+        **Metrics Included:**
+        - HTTP request counts and durations
+        - Database connection pool stats
+        - Redis connection stats
+        - Memory usage
+        - CPU usage
+        - Custom business metrics
+
+        **Format:**
+        Returns metrics in Prometheus text format for scraping by monitoring systems.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Metrics retrieved successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP http_requests_total Total number of HTTP requests
+                  # TYPE http_requests_total counter
+                  http_requests_total{method="GET",status="200"} 1234
+
+                  # HELP http_request_duration_seconds HTTP request duration
+                  # TYPE http_request_duration_seconds histogram
+                  http_request_duration_seconds_bucket{le="0.1"} 100
+                  http_request_duration_seconds_bucket{le="0.5"} 200
+                  http_request_duration_seconds_bucket{le="1.0"} 250
+                  http_request_duration_seconds_bucket{le="+Inf"} 300
+                  http_request_duration_seconds_sum 45.67
+                  http_request_duration_seconds_count 300
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - admin role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: "Admin role required to access metrics"
+                error: "INSUFFICIENT_PERMISSIONS"
+
+  /api/chefaodacasa/cache/stats:
+    get:
+      operationId: getCacheStats
+      tags: [System]
+      summary: Get cache statistics (Admin only)
+      description: |
+        Get detailed statistics about the application cache performance.
+
+        **Security:**
+        - Admin-only endpoint (no explicit authentication middleware, but restricted by URL pattern)
+        - Rate limited: 1000 requests/minute for admin users
+
+        **Statistics Included:**
+        - Cache hit/miss ratios
+        - Total cache operations
+        - Cache size and memory usage
+        - Cache uptime
+        - Performance metrics
+
+        **Usage:**
+        - Performance monitoring
+        - Cache optimization
+        - Troubleshooting cache issues
+      responses:
+        "200":
+          description: Cache statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      hits:
+                        type: integer
+                        description: "Number of cache hits"
+                        example: 1500
+                      misses:
+                        type: integer
+                        description: "Number of cache misses"
+                        example: 300
+                      hitRate:
+                        type: string
+                        description: "Cache hit rate percentage"
+                        example: "83.33%"
+                      total:
+                        type: integer
+                        description: "Total cache operations"
+                        example: 1800
+                      uptime:
+                        type: string
+                        description: "Cache uptime since last reset"
+                        example: "3600s"
+                      keys:
+                        type: integer
+                        description: "Number of keys in cache"
+                        example: 250
+                      memory:
+                        type: object
+                        properties:
+                          used:
+                            type: string
+                            example: "15.2MB"
+                          available:
+                            type: string
+                            example: "100MB"
+        "500":
+          description: Error retrieving cache statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/chefaodacasa/cache/reset:
+    post:
+      operationId: resetCacheStats
+      tags: [System]
+      summary: Reset cache statistics (Admin only)
+      description: |
+        Reset cache statistics counters to zero.
+
+        **Security:**
+        - Admin-only endpoint (no explicit authentication middleware, but restricted by URL pattern)
+        - Rate limited: 1000 requests/minute for admin users
+
+        **Actions:**
+        - Resets hit/miss counters
+        - Resets uptime counter
+        - Preserves actual cached data
+        - Updates last reset timestamp
+
+        **Usage:**
+        - Performance testing
+        - Monitoring reset after configuration changes
+        - Troubleshooting and debugging
+      responses:
+        "200":
+          description: Cache statistics reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Cache statistics reset successfully"
+                  data:
+                    type: object
+                    properties:
+                      hits:
+                        type: integer
+                        example: 0
+                      misses:
+                        type: integer
+                        example: 0
+                      lastReset:
+                        type: string
+                        format: date-time
+                        example: "2024-01-01T12:00:00.000Z"
+        "500":
+          description: Error resetting cache statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /books/{id}:
     get:
       operationId: booksGetById
@@ -305,7 +2690,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
@@ -316,13 +2701,13 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: '#/components/schemas/Book'
-        '404':
+                    $ref: "#/components/schemas/Book"
+        "404":
           description: Not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
   /books/author/{authorId}:
     get:
       operationId: booksGetAuthor
@@ -334,29 +2719,72 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
   /collections:
     get:
       operationId: collectionsList
       tags: [Collections]
       summary: Get user's collections
+      description: |
+        Retrieve all collections for the authenticated user.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Returns only collections owned by the authenticated user
+
+        **Response:**
+        - List of user's collections with basic information
+        - Includes collection count
       security:
         - bearerAuth: []
-      parameters:
-        - in: query
-          name: page
-          schema: { type: integer, default: 1 }
-        - in: query
-          name: limit
-          schema: { type: integer, default: 10 }
       responses:
-        '200':
-          description: OK
+        "200":
+          description: Collections retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 3
+                    description: "Number of collections returned"
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookCollection"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
     post:
       operationId: collectionsCreate
       tags: [Collections]
       summary: Create a new collection
+      description: |
+        Create a new book collection.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Free users limited to 5 collections
+        - Pro users have unlimited collections
+
+        **Validation:**
+        - Name: Required, 1-100 characters
+        - Description: Optional, max 500 characters
+        - Category: Must be valid enum value
+        - Color: Must be valid hex color
+        - Tags: Array of strings, max 50 characters each
       security:
         - bearerAuth: []
       requestBody:
@@ -367,12 +2795,119 @@ paths:
               type: object
               required: [name]
               properties:
-                name: { type: string }
-                description: { type: string }
-                isPublic: { type: boolean }
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: "My Favorite Books"
+                  description: "Collection name (required, 1-100 characters)"
+                description:
+                  type: string
+                  maxLength: 500
+                  example: "A collection of my all-time favorite books"
+                  description: "Collection description (optional, max 500 characters)"
+                isPublic:
+                  type: boolean
+                  default: false
+                  example: false
+                  description: "Whether the collection is publicly visible"
+                category:
+                  type: string
+                  enum: [general, wishlist, favorites, currently-reading, completed, custom]
+                  default: general
+                  example: "favorites"
+                  description: "Collection category"
+                color:
+                  type: string
+                  pattern: "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                  default: "#3B82F6"
+                  example: "#FF6B6B"
+                  description: "Collection color (hex format)"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                    maxLength: 50
+                  default: []
+                  example: ["fiction", "classics"]
+                  description: "Collection tags (max 50 characters each)"
+            examples:
+              basic_collection:
+                summary: Basic collection
+                value:
+                  name: "My Reading List"
+                  description: "Books I want to read"
+                  isPublic: false
+              detailed_collection:
+                summary: Detailed collection
+                value:
+                  name: "Science Fiction Classics"
+                  description: "The best sci-fi books of all time"
+                  isPublic: true
+                  category: "favorites"
+                  color: "#4ECDC4"
+                  tags: ["sci-fi", "classics", "space"]
       responses:
-        '201':
-          description: Created
+        "201":
+          description: Collection created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/BookCollection"
+        "400":
+          description: Bad request - validation errors or missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_name:
+                  summary: Missing collection name
+                  value:
+                    success: false
+                    error: "Collection name is required"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                duplicate_name:
+                  summary: Collection name already exists
+                  value:
+                    success: false
+                    error: "Collection with this name already exists"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                validation_error:
+                  summary: Validation error
+                  value:
+                    success: false
+                    error: "Validation error"
+                    details:
+                      - field: "name"
+                        message: "Name must be between 1 and 100 characters"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "402":
+          description: Payment required - collection limit reached for free users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Free users are limited to 5 collections. Upgrade to Pro for unlimited collections."
+                timestamp: "2024-01-01T12:00:00.000Z"
   /collections/{id}:
     get:
       operationId: collectionsGetById
@@ -386,7 +2921,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
     put:
       operationId: collectionsUpdate
@@ -415,7 +2950,7 @@ paths:
                   type: array
                   items: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
     delete:
       operationId: collectionsDelete
@@ -429,7 +2964,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
   /collections/by-category/{category}:
     get:
@@ -444,7 +2979,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
   /collections/{id}/share:
     post:
@@ -459,7 +2994,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
   /collections/{id}/stats:
     get:
@@ -474,7 +3009,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
   /collections/{id}/search:
     get:
@@ -501,15 +3036,1490 @@ paths:
           name: favorite
           schema: { type: boolean }
       responses:
-        '200':
+        "200":
           description: OK
-        '400':
+        "400":
           description: Bad request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-security:
-  - bearerAuth: []
+                $ref: "#/components/schemas/ErrorResponse"
+  /collections/{collectionId}/books:
+    post:
+      operationId: collectionsAddBook
+      tags: [Collections]
+      summary: Add book to collection
+      description: |
+        Add a new book to a specific collection.
 
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only add books to their own collections
+
+        **Validation:**
+        - bookId and title are required
+        - Book cannot already exist in the collection
+        - Free users are limited to 5 collections total
+
+        **Response:**
+        - Returns the updated collection with the new book
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: collectionId
+          required: true
+          schema:
+            type: string
+          description: Collection ID
+          example: "507f1f77bcf86cd799439011"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddBookToCollectionRequest"
+            examples:
+              basic_book:
+                summary: Basic book addition
+                value:
+                  bookId: "OL123456M"
+                  title: "The Great Gatsby"
+                  authors: ["F. Scott Fitzgerald"]
+                  coverImage: "https://covers.openlibrary.org/b/id/123456-L.jpg"
+                  readStatus: "to-read"
+              detailed_book:
+                summary: Detailed book with metadata
+                value:
+                  bookId: "OL789012M"
+                  title: "To Kill a Mockingbird"
+                  authors: ["Harper Lee"]
+                  coverImage: "https://covers.openlibrary.org/b/id/789012-L.jpg"
+                  publisher: "J.B. Lippincott & Co."
+                  publishedDate: "1960"
+                  pageCount: 281
+                  isbn: "9780061120084"
+                  language: "en"
+                  genres: ["Fiction", "Classic Literature"]
+                  notes: "Recommended by book club"
+                  rating: 5
+                  readStatus: "completed"
+                  dateStarted: "2024-01-01T00:00:00.000Z"
+                  dateFinished: "2024-01-15T00:00:00.000Z"
+                  progress: 100
+                  favorite: true
+                  personalTags: ["book-club", "must-read"]
+      responses:
+        "200":
+          description: Book added to collection successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/BookCollection"
+        "400":
+          description: Bad request - validation errors or book already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_required:
+                  summary: Missing required fields
+                  value:
+                    success: false
+                    error: "Book ID and title are required"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                book_exists:
+                  summary: Book already in collection
+                  value:
+                    success: false
+                    error: "Book already exists in this collection"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "402":
+          description: Payment required - collection limit reached for free users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                collection_limit:
+                  summary: Collection limit reached
+                  value:
+                    success: false
+                    error: "Free users are limited to 5 collections. Upgrade to Pro for unlimited collections."
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "404":
+          description: Collection not found or access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many requests
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /collections/{collectionId}/books/{bookId}:
+    put:
+      operationId: collectionsUpdateBook
+      tags: [Collections]
+      summary: Update book in collection
+      description: |
+        Update book metadata and reading progress within a collection.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only update books in their own collections
+
+        **Validation:**
+        - At least one field must be provided for update
+        - Rating must be between 1-5 if provided
+        - Progress must be between 0-100 if provided
+
+        **Response:**
+        - Returns the updated collection with modified book data
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: collectionId
+          required: true
+          schema:
+            type: string
+          description: Collection ID
+          example: "507f1f77bcf86cd799439011"
+        - in: path
+          name: bookId
+          required: true
+          schema:
+            type: string
+          description: Book ID within the collection
+          example: "OL123456M"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookInCollectionRequest"
+            examples:
+              update_progress:
+                summary: Update reading progress
+                value:
+                  readStatus: "reading"
+                  progress: 45
+                  dateStarted: "2024-01-01T00:00:00.000Z"
+              complete_book:
+                summary: Mark book as completed
+                value:
+                  readStatus: "completed"
+                  progress: 100
+                  dateFinished: "2024-01-15T00:00:00.000Z"
+                  rating: 4
+                  notes: "Excellent character development"
+                  favorite: true
+              add_notes_rating:
+                summary: Add notes and rating
+                value:
+                  notes: "Great insights into human nature"
+                  rating: 5
+                  personalTags: ["philosophy", "must-read"]
+      responses:
+        "200":
+          description: Book updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/BookCollection"
+        "400":
+          description: Bad request - validation errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_rating:
+                  summary: Invalid rating value
+                  value:
+                    success: false
+                    error: "Rating must be between 1 and 5"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                invalid_progress:
+                  summary: Invalid progress value
+                  value:
+                    success: false
+                    error: "Progress must be between 0 and 100"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Collection or book not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                collection_not_found:
+                  summary: Collection not found
+                  value:
+                    success: false
+                    error: "Collection not found or access denied"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                book_not_found:
+                  summary: Book not found in collection
+                  value:
+                    success: false
+                    error: "Book not found in collection"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "429":
+          description: Too many requests
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: collectionsRemoveBook
+      tags: [Collections]
+      summary: Remove book from collection
+      description: |
+        Remove a book from a specific collection.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only remove books from their own collections
+
+        **Response:**
+        - Returns the updated collection without the removed book
+        - Includes success message confirming removal
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: collectionId
+          required: true
+          schema:
+            type: string
+          description: Collection ID
+          example: "507f1f77bcf86cd799439011"
+        - in: path
+          name: bookId
+          required: true
+          schema:
+            type: string
+          description: Book ID to remove from the collection
+          example: "OL123456M"
+      responses:
+        "200":
+          description: Book removed from collection successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Book removed from collection"
+                  data:
+                    $ref: "#/components/schemas/BookCollection"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Collection or book not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                collection_not_found:
+                  summary: Collection not found
+                  value:
+                    success: false
+                    error: "Collection not found or access denied"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                book_not_found:
+                  summary: Book not found in collection
+                  value:
+                    success: false
+                    error: "Book not found in collection"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "429":
+          description: Too many requests
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /collections/shared/{shareableLink}:
+    get:
+      operationId: collectionsGetShared
+      tags: [Collections]
+      summary: Get public shared collection
+      description: |
+        Retrieve a publicly shared collection using its shareable link.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Only returns collections marked as public
+        - Rate limited for anonymous users
+
+        **Response:**
+        - Returns the shared collection with all books
+        - Includes basic user information (username, email) of the collection owner
+      parameters:
+        - in: path
+          name: shareableLink
+          required: true
+          schema:
+            type: string
+          description: Unique shareable link identifier
+          example: "abc123def456"
+      responses:
+        "200":
+          description: Shared collection retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/BookCollection"
+                      - type: object
+                        properties:
+                          user:
+                            type: object
+                            properties:
+                              username:
+                                type: string
+                                example: "bookworm123"
+                              email:
+                                type: string
+                                format: email
+                                example: "user@example.com"
+        "404":
+          description: Shared collection not found or not public
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                not_found:
+                  summary: Collection not found
+                  value:
+                    success: false
+                    error: "Shared collection not found or not public"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "429":
+          description: Too many requests
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /users/profile:
+    get:
+      operationId: usersGetProfile
+      tags: [Users]
+      summary: Get user profile
+      description: |
+        Retrieve the current user's profile information.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Returns user's profile data excluding sensitive fields
+
+        **Response:**
+        - User profile with preferences and settings
+        - Excludes password and security tokens
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "507f1f77bcf86cd799439011"
+                      username:
+                        type: string
+                        example: "johndoe"
+                      email:
+                        type: string
+                        format: email
+                        example: "john@example.com"
+                      role:
+                        type: string
+                        enum: [user, chefaodacasa]
+                        example: "user"
+                      emailVerified:
+                        type: boolean
+                        example: true
+                      twoFactorEnabled:
+                        type: boolean
+                        example: false
+                      preferences:
+                        type: object
+                        additionalProperties: true
+                        example:
+                          theme: "light"
+                          emailNotifications: true
+                      createdAt:
+                        type: string
+                        format: date-time
+                        example: "2024-01-01T12:00:00.000Z"
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        example: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "User not found"
+                timestamp: "2024-01-01T12:00:00.000Z"
+    put:
+      operationId: usersUpdateProfile
+      tags: [Users]
+      summary: Update user profile
+      description: |
+        Update the current user's profile information.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only update their own profile
+
+        **Validation:**
+        - Username: 3-30 characters, alphanumeric and underscores only (matches Joi validation)
+        - Email: Valid email format, must be unique
+        - Additional fields: firstName, lastName, bio (optional)
+
+        **Note:** At least one field must be provided for update.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: "^[a-zA-Z0-9_]+$"
+                  example: "johndoe_updated"
+                  description: "New username (3-30 characters, alphanumeric and underscores only)"
+                email:
+                  type: string
+                  format: email
+                  example: "newemail@example.com"
+                  description: "New email address"
+                firstName:
+                  type: string
+                  maxLength: 50
+                  example: "John"
+                  description: "First name (max 50 characters)"
+                lastName:
+                  type: string
+                  maxLength: 50
+                  example: "Doe"
+                  description: "Last name (max 50 characters)"
+                bio:
+                  type: string
+                  maxLength: 500
+                  example: "Book enthusiast and avid reader"
+                  description: "User bio (max 500 characters)"
+              minProperties: 1
+            examples:
+              update_username:
+                summary: Update username only
+                value:
+                  username: "johndoe_updated"
+              update_email:
+                summary: Update email only
+                value:
+                  email: "newemail@example.com"
+              update_profile:
+                summary: Update full profile
+                value:
+                  username: "johndoe_updated"
+                  email: "newemail@example.com"
+                  firstName: "John"
+                  lastName: "Doe"
+                  bio: "Book enthusiast and avid reader"
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                        example: "johndoe_updated"
+                      email:
+                        type: string
+                        format: email
+                        example: "newemail@example.com"
+        "400":
+          description: Bad request - validation errors or no fields provided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                no_fields:
+                  summary: No fields provided
+                  value:
+                    success: false
+                    error: "At least one field must be provided"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                validation_error:
+                  summary: Validation error
+                  value:
+                    success: false
+                    error: "Validation error"
+                    details:
+                      - field: "username"
+                        message: "Username must be between 3 and 30 characters"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "User not found"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "409":
+          description: Conflict - username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                duplicate_username:
+                  summary: Username already exists
+                  value:
+                    success: false
+                    error: "Username already exists"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                duplicate_email:
+                  summary: Email already exists
+                  value:
+                    success: false
+                    error: "Email already exists"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+  /users/password:
+    put:
+      operationId: usersChangePassword
+      tags: [Users]
+      summary: Change user password
+      description: |
+        Change the current user's password.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - Current password verification required
+        - New password must meet security requirements (minimum 6 characters based on validation)
+        - Password history check prevents reuse of previous passwords
+        - Generates new JWT tokens after successful change
+
+        **Password Requirements:**
+        - Minimum 6 characters (matches actual Joi validation)
+        - Cannot be the same as current password
+        - Cannot match previously used passwords
+
+        **Side Effects:**
+        - Increments user's token version (invalidates existing tokens)
+        - Returns new access and refresh tokens
+        - Logs password change event for audit
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                  example: "currentpassword123"
+                  description: "Current password for verification"
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 6
+                  example: "newpassword456"
+                  description: "New password (minimum 6 characters)"
+            examples:
+              password_change:
+                summary: Change password
+                value:
+                  currentPassword: "currentpassword123"
+                  newPassword: "newpassword456"
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Password updated successfully"
+                  accessToken:
+                    type: string
+                    description: "New JWT access token"
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refreshToken:
+                    type: string
+                    description: "New JWT refresh token"
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "400":
+          description: Bad request - validation errors or password requirements not met
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_fields:
+                  summary: Missing required fields
+                  value:
+                    success: false
+                    error: "Current password and new password are required"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                same_password:
+                  summary: New password same as current
+                  value:
+                    success: false
+                    error: "New password must be different from current password"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                password_reused:
+                  summary: Password previously used
+                  value:
+                    success: false
+                    error: "Password has been used previously. Please choose a different password."
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "401":
+          description: Unauthorized - invalid token or incorrect current password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_token:
+                  summary: Invalid or expired token
+                  value:
+                    success: false
+                    error: "Unauthorized"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                incorrect_password:
+                  summary: Incorrect current password
+                  value:
+                    success: false
+                    error: "Current password is incorrect"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "User not found"
+                timestamp: "2024-01-01T12:00:00.000Z"
+                    example: "Password updated successfully"
+                  accessToken:
+                    type: string
+                    description: "New JWT access token (1 hour expiration)"
+                  refreshToken:
+                    type: string
+                    description: "New JWT refresh token (7 days expiration)"
+        "400":
+          description: Bad request - validation errors or password policy violations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_fields:
+                  summary: Missing required fields
+                  value:
+                    success: false
+                    error: "Current password and new password are required"
+                same_password:
+                  summary: New password same as current
+                  value:
+                    success: false
+                    error: "New password must be different from current password"
+                password_reused:
+                  summary: Password previously used
+                  value:
+                    success: false
+                    error: "Password has been used previously. Please choose a different password."
+                weak_password:
+                  summary: Password doesn't meet requirements
+                  value:
+                    success: false
+                    error: "Password must be at least 8 characters and contain uppercase, lowercase, number, and special character"
+        "401":
+          description: Unauthorized - invalid token or incorrect current password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_token:
+                  summary: Invalid or expired token
+                  value:
+                    success: false
+                    error: "Invalid or expired token"
+                wrong_password:
+                  summary: Incorrect current password
+                  value:
+                    success: false
+                    error: "Current password is incorrect"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /users/preferences:
+    get:
+      operationId: usersGetPreferences
+      tags: [Users]
+      summary: Get user preferences
+      description: |
+        Retrieve the current user's application preferences.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only access their own preferences
+
+        **Response:**
+        - User's application preferences object
+        - Returns empty object if no preferences set
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UserPreferences"
+              examples:
+                default_preferences:
+                  summary: Default preferences
+                  value:
+                    success: true
+                    data:
+                      theme: "light"
+                      booksPerPage: 10
+                      defaultSearchType: "title"
+                custom_preferences:
+                  summary: Custom preferences
+                  value:
+                    success: true
+                    data:
+                      theme: "dark"
+                      booksPerPage: 20
+                      defaultSearchType: "author"
+                      language: "en"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: usersUpdatePreferences
+      tags: [Users]
+      summary: Update user preferences
+      description: |
+        Update the current user's application preferences.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only update their own preferences
+
+        **Validation:**
+        - Preferences must be a valid object
+        - Individual preference values are validated based on type
+
+        **Note:** The entire preferences object is replaced, not merged.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [preferences]
+              properties:
+                preferences:
+                  $ref: "#/components/schemas/UserPreferences"
+            examples:
+              update_theme:
+                summary: Update theme preference
+                value:
+                  preferences:
+                    theme: "dark"
+                    booksPerPage: 10
+                    defaultSearchType: "title"
+              update_multiple:
+                summary: Update multiple preferences
+                value:
+                  preferences:
+                    theme: "auto"
+                    booksPerPage: 25
+                    defaultSearchType: "author"
+                    language: "es"
+      responses:
+        "200":
+          description: Preferences updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UserPreferences"
+        "400":
+          description: Bad request - invalid preferences object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_preferences:
+                  summary: Invalid preferences object
+                  value:
+                    success: false
+                    error: "Valid preferences object is required"
+                validation_error:
+                  summary: Preference validation error
+                  value:
+                    success: false
+                    error: "Invalid theme value. Must be 'light', 'dark', or 'auto'"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /users/data-export:
+    get:
+      operationId: usersDataExport
+      tags: [Users]
+      summary: Export user data (GDPR compliance)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User data export
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+                      collections:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/BookCollection"
+                      exportedAt:
+                        type: string
+                        format: date-time
+        "401":
+          description: Unauthorized
+  /users/delete-account:
+    delete:
+      operationId: usersDeleteAccount
+      tags: [Users]
+      summary: Delete user account and all associated data (GDPR compliance)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  description: Current password for confirmation
+      responses:
+        "200":
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+        "400":
+          description: Invalid password
+        "401":
+          description: Unauthorized
+  /users/notification-preferences:
+    get:
+      operationId: usersGetNotificationPreferences
+      tags: [Users]
+      summary: Get user notification preferences
+      description: |
+        Retrieve the current user's email notification preferences.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only access their own notification preferences
+
+        **Response:**
+        - Email notification preferences with default values if not set
+        - All notification types are included in the response
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notification preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      emailNotifications:
+                        type: object
+                        description: Email notification preferences
+                        properties:
+                          marketing:
+                            type: boolean
+                            default: false
+                            description: Receive marketing and promotional emails
+                            example: false
+                          productUpdates:
+                            type: boolean
+                            default: true
+                            description: Receive product updates and feature announcements
+                            example: true
+                          securityAlerts:
+                            type: boolean
+                            default: true
+                            description: Receive security alerts and account notifications
+                            example: true
+                          collectionShares:
+                            type: boolean
+                            default: true
+                            description: Receive notifications when collections are shared with you
+                            example: true
+              examples:
+                default_preferences:
+                  summary: Default notification preferences
+                  value:
+                    success: true
+                    data:
+                      emailNotifications:
+                        marketing: false
+                        productUpdates: true
+                        securityAlerts: true
+                        collectionShares: true
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: usersUpdateNotificationPreferences
+      tags: [Users]
+      summary: Update user notification preferences
+      description: |
+        Update the current user's email notification preferences.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User can only update their own notification preferences
+
+        **Validation:**
+        - emailNotifications must be a valid object
+        - All notification type values must be boolean
+
+        **Side Effects:**
+        - Logs preference change event for audit
+        - Updates user's notification settings immediately
+
+        **GDPR Compliance:**
+        - Users can opt-out of marketing communications
+        - Security alerts cannot be disabled for account safety
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emailNotifications]
+              properties:
+                emailNotifications:
+                  type: object
+                  description: Email notification preferences to update
+                  properties:
+                    marketing:
+                      type: boolean
+                      description: Receive marketing and promotional emails
+                      example: false
+                    productUpdates:
+                      type: boolean
+                      description: Receive product updates and feature announcements
+                      example: true
+                    securityAlerts:
+                      type: boolean
+                      description: Receive security alerts and account notifications
+                      example: true
+                    collectionShares:
+                      type: boolean
+                      description: Receive notifications when collections are shared with you
+                      example: true
+            examples:
+              opt_out_marketing:
+                summary: Opt out of marketing emails
+                value:
+                  emailNotifications:
+                    marketing: false
+                    productUpdates: true
+                    securityAlerts: true
+                    collectionShares: true
+              minimal_notifications:
+                summary: Minimal notifications (security only)
+                value:
+                  emailNotifications:
+                    marketing: false
+                    productUpdates: false
+                    securityAlerts: true
+                    collectionShares: false
+              all_notifications:
+                summary: Enable all notifications
+                value:
+                  emailNotifications:
+                    marketing: true
+                    productUpdates: true
+                    securityAlerts: true
+                    collectionShares: true
+      responses:
+        "200":
+          description: Notification preferences updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Notification preferences updated successfully"
+        "400":
+          description: Bad request - invalid notification preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_preferences:
+                  summary: Invalid preferences object
+                  value:
+                    success: false
+                    error: "Valid emailNotifications object is required"
+                invalid_type:
+                  summary: Invalid preference value type
+                  value:
+                    success: false
+                    error: "All notification preferences must be boolean values"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /billing/checkout:
+    post:
+      operationId: billingCheckout
+      tags: [Billing]
+      summary: Create Stripe Checkout session
+      description: |
+        Create a Stripe Checkout session for Pro subscription.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User must not already have active Pro subscription
+
+        **Process:**
+        - Creates Stripe Checkout session
+        - Redirects to Stripe payment page
+        - Handles success/cancel URLs
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                priceId:
+                  type: string
+                  description: "Optional Stripe Price ID (defaults to STRIPE_PRICE_PRO_MONTHLY from env)"
+                  example: "price_1234567890"
+            examples:
+              default_price:
+                summary: Use default Pro monthly price
+                value: {}
+              custom_price:
+                summary: Use custom price ID
+                value:
+                  priceId: "price_1234567890"
+      responses:
+        "200":
+          description: Checkout session created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  url:
+                    type: string
+                    format: uri
+                    description: "Stripe Checkout session URL"
+                    example: "https://checkout.stripe.com/pay/cs_test_..."
+                  id:
+                    type: string
+                    description: "Stripe Checkout session ID"
+                    example: "cs_test_1234567890"
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "500":
+          description: Internal server error - Stripe configuration issue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Price ID not configured"
+                timestamp: "2024-01-01T12:00:00.000Z"
+  /billing/portal:
+    post:
+      operationId: billingPortal
+      tags: [Billing]
+      summary: Create Stripe Billing Portal session
+      description: |
+        Create a Stripe Billing Portal session for subscription management.
+
+        **Security:**
+        - Requires valid JWT authentication
+        - User must have existing Stripe customer record
+
+        **Features:**
+        - View subscription details
+        - Update payment methods
+        - Download invoices
+        - Cancel subscription
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Billing portal session created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  url:
+                    type: string
+                    format: uri
+                    description: "Stripe Billing Portal URL"
+                    example: "https://billing.stripe.com/session/..."
+        "401":
+          description: Unauthorized - invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Unauthorized"
+                timestamp: "2024-01-01T12:00:00.000Z"
+        "500":
+          description: Internal server error - Stripe error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /billing/webhook:
+    post:
+      operationId: billingWebhook
+      tags: [Billing]
+      summary: Stripe webhook endpoint
+      description: |
+        Handle Stripe webhook events for subscription management.
+
+        **Security:**
+        - Public endpoint (no authentication required)
+        - Validates Stripe webhook signature
+        - Uses raw request body for signature verification
+
+        **Supported Events:**
+        - customer.subscription.created
+        - customer.subscription.updated
+        - customer.subscription.deleted
+        - invoice.payment_succeeded
+        - invoice.payment_failed
+
+        **Processing:**
+        - Updates user subscription status
+        - Logs all webhook events
+        - Returns 200 for successful processing
+      parameters:
+        - in: header
+          name: stripe-signature
+          required: true
+          schema:
+            type: string
+          description: "Stripe webhook signature for verification"
+          example: "t=1234567890,v1=abc123..."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "Stripe webhook event payload (raw JSON)"
+              additionalProperties: true
+              example:
+                id: "evt_1234567890"
+                object: "event"
+                type: "customer.subscription.created"
+                data:
+                  object:
+                    id: "sub_1234567890"
+                    customer: "cus_1234567890"
+                    status: "active"
+      responses:
+        "200":
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+        "400":
+          description: Bad request - missing signature or invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_signature:
+                  summary: Missing Stripe signature
+                  value:
+                    success: false
+                    error: "Missing stripe-signature header"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+                invalid_signature:
+                  summary: Invalid webhook signature
+                  value:
+                    success: false
+                    error: "Invalid webhook signature"
+                    timestamp: "2024-01-01T12:00:00.000Z"
+  /seo/collections/{shareableLink}:
+    get:
+      operationId: seoCollectionPage
+      tags: [SEO]
+      summary: SEO HTML for public collection
+      parameters:
+        - in: path
+          name: shareableLink
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: HTML
+          content:
+            text/html:
+              schema:
+                type: string
+        "404":
+          description: Not found
+# Global security is not applied - each endpoint specifies its own security requirements
+# This allows for proper documentation of public vs protected endpoints
 

@@ -12,6 +12,14 @@ class CollectionController {
         throw new ApiError(400, "Collection name is required");
       }
 
+      // Check collection limits for free users
+      if (req.user.subscriptionTier !== "pro") {
+        const collectionCount = await BookCollection.countDocuments({ user: userId });
+        if (collectionCount >= 5) {
+          throw new ApiError(402, "Free users are limited to 5 collections. Upgrade to Pro for unlimited collections.");
+        }
+      }
+
       // Check if collection with same name already exists for this user
       const existingCollection = await BookCollection.findOne({
         user: userId,
