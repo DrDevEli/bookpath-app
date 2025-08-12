@@ -91,8 +91,11 @@ export function Profile() {
     try {
       setLoading(true);
       const [userResponse, collectionsResponse, statsResponse] = await Promise.all([
+        // GET /users/profile — get user profile
         api.get('/users/profile'),
+        // GET /collections — list user's collections
         api.get('/collections'),
+        // GET /users/stats — get user reading stats
         api.get('/users/stats'),
       ]);
 
@@ -132,6 +135,7 @@ export function Profile() {
   const handleUpdateProfile = async (data: UpdateProfileForm) => {
     try {
       setUpdating(true);
+      // PUT /users/profile — update profile
       const response = await api.put('/users/profile', data);
       if (response.data.success) {
         setUser(response.data.data);
@@ -157,6 +161,7 @@ export function Profile() {
   const handleChangePassword = async (data: ChangePasswordForm) => {
     try {
       setChangingPassword(true);
+      // PUT /users/password — change password
       const response = await api.put('/users/password', {
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,

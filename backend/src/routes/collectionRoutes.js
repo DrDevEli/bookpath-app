@@ -59,6 +59,7 @@ const router = express.Router();
  *             schema:
  *               $ref: '#/definitions/Error'
  */
+// POST /collections — create collection
 router.post(
   "/",
   authMiddleware(),
@@ -105,6 +106,7 @@ router.post(
  *             schema:
  *               $ref: '#/definitions/Error'
  */
+// GET /collections — list user's collections
 router.get(
   "/",
   authMiddleware(),
@@ -144,6 +146,7 @@ router.get(
  *             schema:
  *               $ref: '#/definitions/Error'
  */
+// GET /collections/:id — get collection details
 router.get(
   "/:id",
   authMiddleware(),
@@ -194,6 +197,7 @@ router.get(
  *       404:
  *         description: Collection not found
  */
+// PUT /collections/:id — update collection
 router.put(
   "/:id",
   authMiddleware(),
@@ -224,6 +228,7 @@ router.put(
  *       404:
  *         description: Collection not found
  */
+// DELETE /collections/:id — delete collection
 router.delete(
   "/:id",
   authMiddleware(),
@@ -251,6 +256,7 @@ router.delete(
  *       200:
  *         description: Collections retrieved successfully
  */
+// GET /collections/category/:category — collections by category (backward compatible)
 // Backward compatible category route and preferred by-category route
 router.get(
   "/category/:category",
@@ -258,6 +264,7 @@ router.get(
   rateLimiterMiddleware,
   CollectionController.getCollectionsByCategory
 );
+// GET /collections/by-category/:category — collections by category
 router.get(
   "/by-category/:category",
   authMiddleware(),
@@ -285,6 +292,7 @@ router.get(
  *       200:
  *         description: Shareable link generated
  */
+// POST /collections/:id/share — generate shareable link
 router.post(
   "/:id/share",
   authMiddleware(),
@@ -312,6 +320,7 @@ router.post(
  *       200:
  *         description: Collection statistics
  */
+// GET /collections/:id/stats — get collection statistics
 router.get(
   "/:id/stats",
   authMiddleware(),
@@ -359,6 +368,7 @@ router.get(
  *       200:
  *         description: Search results
  */
+// GET /collections/:id/search — search books in collection
 router.get(
   "/:id/search",
   authMiddleware(),
@@ -368,6 +378,7 @@ router.get(
 );
 
 // Book management in collections
+// POST /collections/:collectionId/books — add book to collection
 router.post(
   "/:collectionId/books",
   authMiddleware(),
@@ -376,6 +387,7 @@ router.post(
   CollectionController.addBookToCollection
 );
 
+// PUT /collections/:collectionId/books/:bookId — update book in collection
 router.put(
   "/:collectionId/books/:bookId",
   authMiddleware(),
@@ -384,6 +396,7 @@ router.put(
   CollectionController.updateBookInCollection
 );
 
+// DELETE /collections/:collectionId/books/:bookId — remove book from collection
 router.delete(
   "/:collectionId/books/:bookId",
   authMiddleware(),
@@ -392,6 +405,7 @@ router.delete(
 );
 
 // Public shared collection route (no auth required)
+// GET /collections/shared/:shareableLink — get public shared collection
 router.get(
   "/shared/:shareableLink",
   rateLimiterMiddleware,

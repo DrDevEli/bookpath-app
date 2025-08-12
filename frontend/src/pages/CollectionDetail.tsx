@@ -67,6 +67,7 @@ export function CollectionDetail() {
     
     try {
       setLoading(true);
+      // GET /collections/:id — get collection details
       const response = await api.get(`/collections/${id}`);
       if (response.data.success) {
         setCollection(response.data.data);
@@ -91,6 +92,7 @@ export function CollectionDetail() {
   const handleUpdateBook = async (bookId: string, data: UpdateBookForm) => {
     try {
       setUpdating(true);
+      // PUT /collections/:id/books/:bookId — update book in collection
       const response = await api.put(`/collections/${id}/books/${bookId}`, data);
       if (response.data.success) {
         setCollection(response.data.data);
@@ -122,6 +124,7 @@ export function CollectionDetail() {
     }
 
     try {
+      // DELETE /collections/:id/books/:bookId — remove book from collection
       const response = await api.delete(`/collections/${id}/books/${bookId}`);
       if (response.data.success) {
         setCollection(response.data.data);

@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import openLibraryService from "./src/services/openLibraryService.js";
 import BookSearchService from "./src/services/bookSearchService.js";
-import advancedSearchService from "./src/services/advancedSearchService.js";
+import advancedSearchService from "./src/services/searchAdvanceService.js";
 
 // Load environment variables
 dotenv.config();

@@ -5,20 +5,24 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Public routes
+// POST /users/register — register
 router.post("/register", rateLimiterMiddleware, UserController.register);
+// POST /users/login — login
 router.post("/login", rateLimiterMiddleware, UserController.login);
 
-// Protected routes (require authentication)
+// GET /users/profile — get profile
 router.get("/profile", authMiddleware(), UserController.getProfile);
+// PUT /users/profile — update profile
 router.put("/profile", authMiddleware(), UserController.updateProfile);
+// POST /users/logout — logout
 router.post("/logout", authMiddleware(), UserController.logout);
 
-// Password management
+// PUT /users/password — change password
 router.put("/password", authMiddleware(), UserController.changePassword);
 
-// User preferences
+// GET /users/preferences — get preferences
 router.get("/preferences", authMiddleware(), UserController.getUserPreferences);
+// PUT /users/preferences — update preferences
 router.put(
   "/preferences",
   authMiddleware(),

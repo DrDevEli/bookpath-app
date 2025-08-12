@@ -40,6 +40,7 @@ export function Register() {
       setIsSubmitting(true);
       setError(null);
       
+      // POST /users/register — register user
       const response = await api.post('/users/register', {
         username: data.username,
         email: data.email,

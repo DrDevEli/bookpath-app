@@ -108,6 +108,7 @@ export function Collections() {
   const fetchCollections = async () => {
     try {
       setLoading(true);
+      // GET /collections — list user's collections
       const response = await api.get('/collections');
       if (response.data.success) {
         setCollections(response.data.data);
@@ -123,6 +124,7 @@ export function Collections() {
   const onSubmit = async (data: CreateCollectionForm) => {
     try {
       setCreating(true);
+      // POST /collections — create collection
       const response = await api.post('/collections', data);
       if (response.data.success) {
         setCollections([...collections, response.data.data]);
@@ -158,6 +160,7 @@ export function Collections() {
   const handleShare = async (collectionId: string) => {
     try {
       setSharingCollection(collectionId);
+      // POST /collections/:id/share — generate share link
       const response = await api.post(`/collections/${collectionId}/share`);
       if (response.data.success) {
         const shareableUrl = response.data.data.shareableUrl;

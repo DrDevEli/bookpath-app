@@ -75,3 +75,5 @@ class AdvancedSearchService {
 }
 
 export default new AdvancedSearchService();
+
+

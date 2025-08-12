@@ -62,6 +62,7 @@ export function BookDetails() {
   const fetchBookDetails = useCallback(async () => {
     try {
       setLoading(true);
+      // GET /books/:id — get book details
       const response = await api.get(`/books/${id}`);
       if (response.data.success) {
         setBook(response.data.data);
@@ -75,6 +76,7 @@ export function BookDetails() {
 
   const fetchCollections = useCallback(async () => {
     try {
+      // GET /collections — list user's collections
       const response = await api.get('/collections');
       if (response.data.success) {
         setCollections(response.data.data);
@@ -98,6 +100,7 @@ export function BookDetails() {
 
     try {
       setAdding(true);
+      // POST /collections/:collectionId/books — add book to collection
       const response = await api.post(`/collections/${data.collectionId}/books`, {
         bookId: book.id,
         title: book.title,

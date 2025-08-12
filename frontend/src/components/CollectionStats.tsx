@@ -37,6 +37,7 @@ export function CollectionStats({ collectionId, isVisible, onClose }: Collection
     try {
       setLoading(true);
       setError(null);
+      // GET /collections/:id/stats — get collection statistics
       const response = await api.get(`/collections/${collectionId}/stats`);
       if (response.data.success) {
         setStats(response.data.data);

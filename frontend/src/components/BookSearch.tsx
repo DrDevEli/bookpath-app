@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,10 +66,18 @@ export function BookSearch() {
   const [showAddToCollection, setShowAddToCollection] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [priceMin, setPriceMin] = useState<string>('');
+  const [priceMax, setPriceMax] = useState<string>('');
+  const [amazonOnly, setAmazonOnly] = useState<boolean>(false);
+  const [lastSearchParams, setLastSearchParams] = useState<Record<string, string>>({});
+  const [lastEndpoint, setLastEndpoint] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const isLoggedIn = isAuthenticated();
   const { toast } = useToast();
 
-  const { register, handleSubmit } = useForm<BookSearchForm>();
+  const { register, handleSubmit, getValues } = useForm<BookSearchForm>();
   const {
     register: registerCollection,
     handleSubmit: handleCollectionSubmit,
@@ -90,6 +98,7 @@ export function BookSearch() {
 
   const fetchCollections = async () => {
     try {
+      // GET /collections — list user's collections
       const response = await api.get('/collections');
       if (response.data.success) {
         setCollections(response.data.data);
@@ -112,7 +121,15 @@ export function BookSearch() {
       if (category) params.append('category', category);
       if (condition) params.append('condition', condition);
       if (sort) params.append('sort', sort);
+      if (priceMin) params.append('priceMin', priceMin);
+      if (priceMax) params.append('priceMax', priceMax);
+      if (amazonOnly) params.append('amazonOnly', 'true');
 
+      // Save for pagination reuse
+      setLastSearchParams(Object.fromEntries(params.entries()));
+      setLastEndpoint('/books/search');
+
+      // GET /books/search — search books
       const response = await api.get(`/books/search?${params.toString()}`);
       
       if (response.data.success) {
@@ -155,40 +172,111 @@ export function BookSearch() {
     }
   };
 
-  const handlePageChange = async (page: number) => {
-    if (!pagination) return;
-    
+  const onAdvancedSearch = async () => {
     setLoading(true);
+    setError(null);
+    setSearchResults([]);
+    setPagination(null);
+
     try {
+      const values = getValues();
       const params = new URLSearchParams();
-      // Re-construct search parameters (you might want to store these in state)
-      if (category) params.append('category', category);
-      if (condition) params.append('condition', condition);
-      if (sort) params.append('sort', sort);
-      params.append('page', page.toString());
-      
-      const response = await api.get(`/books/search?${params.toString()}`);
-      
+      if (values.title) params.append('title', values.title);
+      if (values.author) params.append('author', values.author);
+      if (category) params.append('genre', category);
+
+      // Save for pagination reuse (advanced endpoint supports page)
+      setLastSearchParams(Object.fromEntries(params.entries()));
+      setLastEndpoint('/books/search/advanced');
+
+      const response = await api.get(`/books/search/advanced?${params.toString()}`);
+
       if (response.data.success) {
         setSearchResults(response.data.data || []);
         setPagination(response.data.pagination || null);
+
+        if (!response.data.data || response.data.data.length === 0) {
+          setError("No books found matching your advanced search.");
+          toast({
+            variant: "info",
+            title: "No Results",
+            description: "No books found matching your advanced search criteria.",
+          });
+        } else {
+          toast({
+            variant: "success",
+            title: "Advanced Search Complete",
+            description: `Found ${response.data.data.length} books matching your advanced search.`,
+          });
+        }
+      } else {
+        setError("Advanced search failed. Please try again.");
+        toast({
+          variant: "destructive",
+          title: "Advanced Search Failed",
+          description: "Unable to complete your advanced search. Please try again.",
+        });
       }
     } catch (err: any) {
-      console.error("Page change error:", err);
-      setError("Failed to load page. Please try again.");
+      console.error("Advanced search error:", err);
+      const errorMessage = err.response?.data?.message || err.message || "Error fetching books.";
+      setError(errorMessage);
       toast({
         variant: "destructive",
-        title: "Page Load Error",
-        description: "Failed to load the requested page.",
+        title: "Advanced Search Error",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
     }
   };
 
+  const loadMore = async () => {
+    if (!pagination || !pagination.hasNextPage || loadingMore || !lastEndpoint) return;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams(lastSearchParams);
+      const nextPage = (pagination.currentPage || 1) + 1;
+      params.set('page', nextPage.toString());
+
+      const response = await api.get(`${lastEndpoint}?${params.toString()}`);
+      if (response.data.success) {
+        const more = response.data.data || [];
+        setSearchResults(prev => [...prev, ...more]);
+        setPagination(response.data.pagination || null);
+      }
+    } catch (err: any) {
+      console.error("Load more error:", err);
+      toast({
+        variant: "destructive",
+        title: "Load More Error",
+        description: "Failed to load additional results.",
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const sentinel = loadMoreRef.current;
+    const observer = new IntersectionObserver((entries) => {
+      const first = entries[0];
+      if (first.isIntersecting) {
+        loadMore();
+      }
+    }, { root: null, rootMargin: '400px', threshold: 0 });
+    observer.observe(sentinel);
+    return () => {
+      observer.unobserve(sentinel);
+      observer.disconnect();
+    };
+  }, [pagination, lastEndpoint, lastSearchParams]);
+
   const handleAddToCollection = async (book: Book, data: AddToCollectionForm) => {
     try {
       setAdding(true);
+      // POST /collections/:collectionId/books — add book to collection
       const response = await api.post(`/collections/${data.collectionId}/books`, {
         bookId: book.id,
         title: book.title,
@@ -266,56 +354,133 @@ export function BookSearch() {
                 className="bg-muted border-0 focus:ring-2 focus:ring-primary text-text-primary"
               />
             </div>
-            {/* Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="category" className="text-text-primary">Category</Label>
-                <select
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
-                >
-                  <option value="">Any</option>
-                  <option value="Fiction">Fiction</option>
-                  <option value="Non-fiction">Non-fiction</option>
-                  <option value="Sci-Fi">Sci-Fi</option>
-                  <option value="Fantasy">Fantasy</option>
-                  <option value="Mystery">Mystery</option>
-                  <option value="Romance">Romance</option>
-                  <option value="History">History</option>
-                  <option value="Biography">Biography</option>
-                  <option value="Self-Help">Self-Help</option>
-                  <option value="Business">Business</option>
-                  <option value="Tech">Tech</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="condition" className="text-text-primary">Condition</Label>
-                <select
-                  id="condition"
-                  value={condition}
-                  onChange={(e) => setCondition(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
-                >
-                  <option value="">Any</option>
-                  <option value="new">New</option>
-                  <option value="used">Used</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="sort" className="text-text-primary">Sort By</Label>
-                <select
-                  id="sort"
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
-                >
-                  <option value="">Relevance</option>
-                  <option value="newest">Newest</option>
-                  <option value="author_az">Author A–Z</option>
-                </select>
-              </div>
+            {/* Filters Dropdown */}
+            <div className="relative">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowFilters((prev) => !prev)}
+                className="border-muted text-text-primary"
+              >
+                {showFilters ? 'Hide Filters' : 'Filters'}
+              </Button>
+              {showFilters && (
+                <div className="absolute z-20 mt-2 w-full sm:w-[36rem] rounded-lg border border-gray-200 bg-white p-4 shadow-xl">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="category" className="text-text-primary">Category</Label>
+                      <select
+                        id="category"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
+                      >
+                        <option value="">Any</option>
+                        <option value="Fiction">Fiction</option>
+                        <option value="Non-fiction">Non-fiction</option>
+                        <option value="Sci-Fi">Sci-Fi</option>
+                        <option value="Fantasy">Fantasy</option>
+                        <option value="Mystery">Mystery</option>
+                        <option value="Romance">Romance</option>
+                        <option value="History">History</option>
+                        <option value="Biography">Biography</option>
+                        <option value="Self-Help">Self-Help</option>
+                        <option value="Business">Business</option>
+                        <option value="Tech">Tech</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="condition" className="text-text-primary">Condition</Label>
+                      <select
+                        id="condition"
+                        value={condition}
+                        onChange={(e) => setCondition(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
+                      >
+                        <option value="">Any</option>
+                        <option value="new">New</option>
+                        <option value="used">Used</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="sort" className="text-text-primary">Sort By</Label>
+                      <select
+                        id="sort"
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
+                      >
+                        <option value="">Relevance</option>
+                        <option value="newest">Newest</option>
+                        <option value="author_az">Author A–Z</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-text-primary">Price Range (USD)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="Min"
+                          value={priceMin}
+                          onChange={(e) => setPriceMin(e.target.value)}
+                          className="bg-muted border-0 focus:ring-2 focus:ring-primary text-text-primary"
+                        />
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="Max"
+                          value={priceMax}
+                          onChange={(e) => setPriceMax(e.target.value)}
+                          className="bg-muted border-0 focus:ring-2 focus:ring-primary text-text-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-text-primary">Amazon Links</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="amazonOnly"
+                          type="checkbox"
+                          checked={amazonOnly}
+                          onChange={(e) => setAmazonOnly(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="amazonOnly" className="text-text-secondary">Only show results with Amazon links</Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setCategory('');
+                        setCondition('');
+                        setSort('');
+                        setPriceMin('');
+                        setPriceMax('');
+                        setAmazonOnly(false);
+                      }}
+                      className="bg-muted text-text-secondary"
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setShowFilters(false)}
+                      className="bg-primary text-white"
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="author" className="text-text-primary">Author</Label>
@@ -327,6 +492,21 @@ export function BookSearch() {
                 className="bg-muted border-0 focus:ring-2 focus:ring-primary text-text-primary"
               />
             </div>
+            <Button
+              type="button"
+              onClick={onAdvancedSearch}
+              className="w-full bg-secondary text-white hover:bg-primary transition-colors duration-200 shadow-md rounded-lg"
+              disabled={loading}
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Searching...
+                </div>
+              ) : (
+                "Advanced Search"
+              )}
+            </Button>
             <Button type="submit" className="w-full bg-primary text-white hover:bg-secondary transition-colors duration-200 shadow-md rounded-lg" disabled={loading}>
               {loading ? (
                 <div className="flex items-center gap-2">
@@ -447,31 +627,16 @@ export function BookSearch() {
               </div>
             </div>
           )}
-          {pagination && pagination.totalPages > 1 && (
-            <div className="flex justify-center gap-4 mt-8">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!pagination.hasPreviousPage || loading}
-                onClick={() => handlePageChange(pagination.currentPage - 1)}
-                className="transition-all duration-300 hover:scale-105 border-primary text-primary font-semibold"
-              >
-                Previous
-              </Button>
-              <span className="flex items-center px-4 text-base text-text-secondary">
-                Page {pagination.currentPage} of {pagination.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!pagination.hasNextPage || loading}
-                onClick={() => handlePageChange(pagination.currentPage + 1)}
-                className="transition-all duration-300 hover:scale-105 border-primary text-primary font-semibold"
-              >
-                Next
-              </Button>
-            </div>
-          )}
+          <div className="mt-8 flex flex-col items-center">
+            {/* Sentinel for infinite scroll */}
+            <div ref={loadMoreRef} />
+            {loadingMore && (
+              <div className="mt-4 text-text-secondary">Loading more…</div>
+            )}
+            {pagination && !pagination.hasNextPage && (
+              <div className="mt-4 text-text-secondary">End of results</div>
+            )}
+          </div>
         </div>
       )}
 
@@ -492,4 +657,4 @@ export function BookSearch() {
       )}
     </div>
   );
-} 
+}

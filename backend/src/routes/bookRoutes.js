@@ -5,35 +5,35 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Book search (by title/author) - Public access
+// GET /books/search — search books
 router.get(
   "/search",
   rateLimiterMiddleware,
   BookController.searchBooks
 );
 
-// Advanced search - Public access
+// GET /books/search/advanced — advanced search
 router.get(
   "/search/advanced",
   rateLimiterMiddleware,
   BookController.advancedSearch
 );
 
-// Get book by ID - Public access
+// GET /books/:id — get book by ID
 router.get(
   "/:id",
   rateLimiterMiddleware,
   BookController.getBookById
 );
 
-// Get author details by ID - Public access
+// GET /books/author/:authorId — get author details
 router.get(
   "/author/:authorId",
   rateLimiterMiddleware,
   BookController.getAuthorDetails
 );
 
-// Example protected route (add a book)
+// POST /books — add book (example, protected)
 router.post(
   "/",
   authMiddleware(),

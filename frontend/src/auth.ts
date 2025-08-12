@@ -4,6 +4,7 @@ const TOKEN_KEY = 'auth_token';
 
 export const login = async (email: string, password: string) => {
   try {
+    // POST /auth/login — login
     const response = await api.post('/auth/login', { email, password });
     const { accessToken } = response.data;
     localStorage.setItem(TOKEN_KEY, accessToken);
@@ -15,6 +16,7 @@ export const login = async (email: string, password: string) => {
 };
 
 export const register = async (name: string, email: string, password: string) => {
+  // POST /auth/register — register
   const response = await api.post('/auth/register', { name, email, password });
   return response.data;
 };

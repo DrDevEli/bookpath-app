@@ -70,6 +70,7 @@ const router = express.Router();
  *       409:
  *         description: User already exists
  */
+// POST /auth/register — register
 router.post(
   "/register",
   rateLimiterMiddleware,
@@ -115,6 +116,7 @@ router.post(
  *       401:
  *         description: Invalid credentials
  */
+// POST /auth/login — login
 router.post(
   "/login",
   rateLimiterMiddleware,
@@ -137,6 +139,7 @@ router.post(
  *       401:
  *         description: Unauthorized
  */
+// POST /auth/logout — logout
 router.post("/logout", UserController.logout);
 
 /**
@@ -163,6 +166,7 @@ router.post("/logout", UserController.logout);
  *       401:
  *         description: Invalid refresh token
  */
+// POST /auth/refresh-token — refresh JWT
 router.post("/refresh-token", AuthController.refreshTokens);
 
 /**
@@ -184,6 +188,7 @@ router.post("/refresh-token", AuthController.refreshTokens);
  *       400:
  *         description: Invalid or expired token
  */
+// GET /auth/verify-email/:token — verify email
 router.get("/verify-email/:token", AuthController.verifyEmail);
 
 /**
@@ -211,6 +216,7 @@ router.get("/verify-email/:token", AuthController.verifyEmail);
  *       404:
  *         description: User not found
  */
+// POST /auth/request-password-reset — request password reset
 router.post(
   "/request-password-reset",
   rateLimiterMiddleware,
@@ -245,6 +251,7 @@ router.post(
  *       400:
  *         description: Invalid or expired token
  */
+// POST /auth/reset-password — reset password
 router.post(
   "/reset-password",
   rateLimiterMiddleware,
@@ -252,6 +259,7 @@ router.post(
 );
 
 // CSRF token route
+// GET /auth/csrf-token — get CSRF token
 router.get("/csrf-token", generateCsrfToken, (req, res) => {
   res.status(200).json({
     success: true,
@@ -260,6 +268,7 @@ router.get("/csrf-token", generateCsrfToken, (req, res) => {
 });
 
 // Login route
+// POST /auth/login — login (passport strategy)
 router.post(
   "/login",
   passport.authenticate("local", { session: false }),
@@ -302,6 +311,7 @@ router.post(
 );
 
 // OAuth routes
+// GET /auth/google — Google OAuth start
 router.get(
   "/google",
   passport.authenticate("google", {
@@ -309,6 +319,7 @@ router.get(
   })
 );
 
+// GET /auth/google/callback — Google OAuth callback
 router.get(
   "/google/callback",
   passport.authenticate("google", {
@@ -330,17 +341,23 @@ router.get(
 );
 
 // Two-factor authentication routes
+// POST /auth/2fa/setup — setup two-factor authentication
 router.post("/2fa/setup", authMiddleware(), AuthController.setupTwoFactor);
 router.post(
+  // POST /auth/2fa/verify — verify and enable two-factor authentication
   "/2fa/verify",
   authMiddleware(),
   AuthController.verifyAndEnableTwoFactor
 );
+// POST /auth/2fa/login — verify 2FA at login
 router.post("/2fa/login", AuthController.verifyTwoFactor);
+// POST /auth/2fa/disable — disable two-factor authentication
 router.post("/2fa/disable", authMiddleware(), AuthController.disableTwoFactor);
 
 // Password reset routes
+// POST /auth/forgot-password — request password reset (alt)
 router.post("/forgot-password", AuthController.requestPasswordReset);
+// GET /auth/validate-reset-token/:token — validate reset token
 router.get("/validate-reset-token/:token", async (req, res, next) => {
   try {
     const { token } = req.params;
@@ -356,15 +373,18 @@ router.get("/validate-reset-token/:token", async (req, res, next) => {
 });
 
 // Email verification
+// GET /auth/verify-email/:token — send verification email (alt)
 router.get(
   "/verify-email/:token",
   emailVerificationController.sendVerificationEmail
 );
+// POST /auth/resend-verification — resend verification email (protected)
 router.post(
   "/resend-verification",
   authMiddleware(),
   emailVerificationController.resendVerificationEmailHandler
 );
+// POST /auth/resend-verification-public — resend verification email (public)
 router.post(
   "/resend-verification-public",
   publicResendLimiter,
@@ -393,12 +413,15 @@ router.post(
 );
 
 // Token refresh route
+// POST /auth/refresh — refresh JWT (alt)
 router.post("/refresh", AuthController.refreshTokens);
 
 // Logout route
+// POST /auth/logout — logout (protected)
 router.post("/logout", authMiddleware(), UserController.logout);
 
 // Logout all sessions
+// POST /auth/logout/all — logout of all sessions
 router.post("/logout/all", authMiddleware(), AuthController.logoutAll);
 
 export default router;

@@ -85,7 +85,7 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 // Initialize passport
 app.use(passport.initialize());
 
-// Basic health check route
+// GET /health — service health check
 app.get("/health", async (req, res) => {
   // Check Redis connection
   let redisStatus = "disconnected";
@@ -108,7 +108,7 @@ app.get("/health", async (req, res) => {
   });
 });
 
-// Cache monitoring endpoint
+// GET /api/chefaodacasa/cache/stats — cache statistics
 app.get("/api/chefaodacasa/cache/stats", async (req, res) => {
   try {
     const { cache } = await import("./src/utils/cache.js");
@@ -136,7 +136,7 @@ app.get("/api/chefaodacasa/cache/stats", async (req, res) => {
   }
 });
 
-// Cache reset endpoint
+// POST /api/chefaodacasa/cache/reset — reset cache statistics
 app.post("/api/chefaodacasa/cache/reset", async (req, res) => {
   try {
     const { cache } = await import("./src/utils/cache.js");
@@ -156,10 +156,13 @@ app.post("/api/chefaodacasa/cache/reset", async (req, res) => {
   }
 });
 
-// Routes (versioned)
+// Mount /api/v1/auth — auth routes
 app.use("/api/v1/auth", authRoutes);
+// Mount /api/v1/books — book routes
 app.use("/api/v1/books", bookRoutes);
+// Mount /api/v1/collections — collection routes
 app.use("/api/v1/collections", collectionRoutes);
+// Mount /api/v1/users — user routes
 app.use("/api/v1/users", userRoutes);
 
 // Add Swagger documentation
