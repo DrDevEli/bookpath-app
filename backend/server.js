@@ -10,6 +10,7 @@ import bookRoutes from "./src/routes/bookRoutes.js";
 import collectionRoutes from "./src/routes/collectionRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import billingRoutes from "./src/routes/billingRoutes.js";
+import affiliateRoutes from "./src/routes/affiliateRoutes.js";
 import { handleWebhook } from "./src/services/stripeService.js";
 import seoRoutes from "./src/routes/seoRoutes.js";
 import logger from "./src/config/logger.js";
@@ -95,7 +96,7 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(passport.initialize());
 
 // GET /health — service health check
-app.get("/health", async (req, res) => {
+app.get("/api/health", async (req, res) => {
   // Check Redis connection
   let redisStatus = "disconnected";
   try {
@@ -186,6 +187,8 @@ app.use("/api/v1/collections", collectionRoutes);
 app.use("/api/v1/users", userRoutes);
 // Mount /api/v1/billing — billing routes
 app.use("/api/v1/billing", billingRoutes);
+// Mount /api/v1/affiliate — affiliate routes
+app.use("/api/v1/affiliate", affiliateRoutes);
 // SEO routes
 app.use("/seo", seoRoutes);
 
