@@ -9,9 +9,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const isLoggedIn = isAuthenticated();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  // Label changes only; routes unchanged — Home → Dashboard, Search → Books
   const navItems = [
-    { path: '/', label: 'Home' },
-    { path: '/search', label: 'Search' },
+    { path: '/', label: 'Dashboard' },
+    { path: '/search', label: 'Books' },
     ...(isLoggedIn ? [{ path: '/collections', label: 'Collections' }] : []),
   ];
 
@@ -104,25 +105,44 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     )}
                   </div>
                 ) : (
-                  <Button 
-                    variant="ghost" 
-                    asChild 
-                    style={{ 
-                      color: '#dbcd90', 
-                      border: '1.5px solid #dbcd90',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#dbcd90';
-                      e.currentTarget.style.color = '#000000';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#dbcd90';
-                    }}
-                  >
-                    <Link to="/login">Login</Link>
-                  </Button>
+                  // Replace single Login with Sign in (to /login) and primary Sign up (to /register)
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      asChild 
+                      style={{ 
+                        color: '#dbcd90', 
+                        border: '1.5px solid #dbcd90',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#dbcd90';
+                        e.currentTarget.style.color = '#000000';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#dbcd90';
+                      }}
+                    >
+                      <Link to="/login">Sign in</Link>
+                    </Button>
+                    <Button 
+                      asChild 
+                      style={{ 
+                        backgroundColor: '#dbcd90', 
+                        color: '#000000',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '0.9';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                    >
+                      <Link to="/register">Sign up</Link>
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>

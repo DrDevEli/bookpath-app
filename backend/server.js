@@ -59,6 +59,7 @@ validateEnv([
   "JWT_SECRET",
   "JWT_REFRESH_SECRET",
   "MONGODB_URI",
+  "REDIS_URL",
 ]);
 
 // Initialize Express app

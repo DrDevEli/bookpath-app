@@ -20,6 +20,10 @@
     "check-ports": "node scripts/check-ports.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.864.0",
+    "@aws-sdk/client-secrets-manager": "^3.864.0",
+    "@aws-sdk/client-ses": "^3.864.0",
+    "@aws-sdk/credential-providers": "^3.864.0",
     "@redocly/cli": "^1.28.3",
     "axios": "^1.10.0",
     "bcryptjs": "^3.0.2",

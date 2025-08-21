@@ -1,5 +1,6 @@
 // External dependencies
 import nodemailer from "nodemailer";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { getEnvConfig } from "../utils/envValidator.js";
 import logger from "../config/logger.js";
 
@@ -11,10 +12,14 @@ const emailConfig = getEnvConfig({
   SMTP_PASS: { default: "" },
   FRONTEND_URL: { default: "http://localhost:3000" },
   NODE_ENV: { default: "development" },
+  EMAIL_PROVIDER: { default: "smtp" }, // "smtp" | "ses"
+  SES_SENDER_EMAIL: { default: "" },
+  AWS_REGION: { default: process.env.AWS_REGION || "us-east-1" },
 });
 
 // Email transporter instance (will be created on app startup)
 let transporter;
+let sesClient;
 
 /**
  * Initialize the email transporter once
@@ -39,7 +44,7 @@ async function initializeTransporter() {
         },
       };
       logger.info("📧 Email service running in development mode");
-    } else {
+    } else if (emailConfig.EMAIL_PROVIDER === "smtp") {
       // Create a real SMTP transporter
       transporter = nodemailer.createTransport({
         host: emailConfig.SMTP_HOST,
@@ -52,6 +57,10 @@ async function initializeTransporter() {
       });
 
       logger.info("📬 Email transporter initialized with SMTP settings");
+    } else if (emailConfig.EMAIL_PROVIDER === "ses") {
+      // Initialize AWS SES client; credentials/region are taken from env or shared config
+      sesClient = new SESClient({ region: emailConfig.AWS_REGION });
+      logger.info("📬 SES client initialized", { region: emailConfig.AWS_REGION });
     }
 
     // Only call verify if available (not in mock mode)
@@ -76,11 +85,43 @@ async function initializeTransporter() {
 async function sendEmail({ to, subject, html, text }) {
   try {
     if (!transporter) await initializeTransporter();
+    const senderAddress = emailConfig.EMAIL_PROVIDER === "ses"
+      ? (emailConfig.SES_SENDER_EMAIL || "noreply@bookpath.eu")
+      : (emailConfig.SMTP_USER || "noreply@bookpath.eu");
 
+    if (emailConfig.EMAIL_PROVIDER === "ses" && emailConfig.NODE_ENV !== "development") {
+      if (!sesClient) {
+        sesClient = new SESClient({ region: emailConfig.AWS_REGION });
+      }
+
+      const command = new SendEmailCommand({
+        Destination: { ToAddresses: [to] },
+        Message: {
+          Subject: { Data: subject, Charset: "UTF-8" },
+          Body: {
+            Html: html ? { Data: html, Charset: "UTF-8" } : undefined,
+            Text: { Data: text || "", Charset: "UTF-8" },
+          },
+        },
+        Source: senderAddress,
+      });
+
+      const result = await sesClient.send(command);
+
+      logger.info("📨 Email sent successfully via SES", {
+        messageId: result?.MessageId,
+        to,
+      });
+
+      return {
+        success: true,
+        messageId: result?.MessageId,
+      };
+    }
+
+    // Default to SMTP transporter (or dev mock)
     const mailOptions = {
-      from: `"BookPath API" <${
-        emailConfig.SMTP_USER || "noreply@bookpath.eu"
-      }>`,
+      from: `"BookPath API" <${senderAddress}>`,
       to,
       subject,
       html,

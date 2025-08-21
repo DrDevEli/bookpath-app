@@ -1,6 +1,6 @@
 # 📚 BookPath
 
-**BookPath** is an AI-enhanced book discovery platform that helps users search, collect, and explore books, build personal libraries, and even merchandise book-related items — all through personalized recommendations and curated collections.
+**BookPath** is an enhanced book discovery platform that helps users search, collect, and explore books, build personal libraries, and even merchandise book-related items — all through personalized recommendations and curated collections using AI.
 
 ---
 
