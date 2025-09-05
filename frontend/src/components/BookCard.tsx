@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import DOMAIN_CONFIG from '../config/domain';
 import { Button } from "@/components/ui/button";
 
 interface Book {
@@ -15,6 +16,7 @@ interface Book {
   ratingsCount?: number;
   openLibraryKey?: string;
   price?: number;
+  amazonLink?: string;
   condition?: 'new' | 'used' | 'unknown';
   category?: string;
   description?: string;
@@ -71,6 +73,11 @@ export function BookCard({
       default: return 'To Read';
     }
   };
+
+  const rawBase = process.env.REACT_APP_API_BASE_URL || DOMAIN_CONFIG.getBackendUrl();
+  const trimmedBase = (rawBase || '').replace(/\/+$/, '');
+  const ensureSuffix = (base: string): string => base.endsWith('/api/v1') ? base : base.endsWith('/api') ? `${base}/v1` : `${base}/api/v1`;
+  const API_BASE_URL = ensureSuffix(trimmedBase);
 
   return (
     <div
@@ -202,6 +209,23 @@ export function BookCard({
           >
             <Link to={`/books/${book.id || book.bookId}`}>View</Link>
           </Button>
+
+          {book.amazonLink && (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="transition-all duration-300 hover:scale-105 text-xs px-2 py-1 h-8 min-h-0 w-full border-yellow-600 text-yellow-700 font-semibold"
+            >
+              <a
+                href={`${API_BASE_URL}/affiliate/redirect?url=${encodeURIComponent(book.amazonLink)}&source=amazon&bookId=${encodeURIComponent(book.id || book.bookId || "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Buy on Amazon
+              </a>
+            </Button>
+          )}
           
           {showAddButton && isLoggedIn && onAddToCollection && (
             <Button 
