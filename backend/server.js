@@ -50,8 +50,9 @@ try {
   const yaml = (await import('yaml')).default;
   swaggerSpec = yaml.parse(openApiSpec);
 } catch {
-  // If yaml module is not available, serve raw string; swagger-ui-express can accept JSON only, so parse failure is fatal
-  throw new Error("YAML parser not available. Please add 'yaml' to dependencies.");
+  // If YAML module is not available, do not crash the server; skip API docs instead
+  swaggerSpec = null;
+  logger.warn("YAML parser not available. Skipping /api-docs. Install 'yaml' to enable docs.");
 }
 
 // Validate required environment variables
@@ -192,16 +193,20 @@ app.use("/api/v1/affiliate", affiliateRoutes);
 // SEO routes
 app.use("/seo", seoRoutes);
 
-// Add Swagger documentation
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    explorer: true,
-    customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "BookPath API Documentation",
-  })
-);
+// Add Swagger documentation (only if YAML was parsed successfully)
+if (swaggerSpec) {
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      explorer: true,
+      customCss: ".swagger-ui .topbar { display: none }",
+      customSiteTitle: "BookPath API Documentation",
+    })
+  );
+} else {
+  logger.info("/api-docs endpoint disabled (missing YAML parser)");
+}
 
 // Error handling
 app.use(errorHandler);
