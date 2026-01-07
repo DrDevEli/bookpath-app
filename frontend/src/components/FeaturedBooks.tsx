@@ -48,24 +48,21 @@ const featuredBooks = [
 
 export default function FeaturedBooks() {
   return (
-    <div className="my-8">
-      <h2 className="text-2xl font-bold mb-4">Featured Books</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {featuredBooks.map((book, idx) => (
-          <BookCard
-            key={idx}
-            book={{
-              id: `featured-${idx}`,
-              title: book.title,
-              authors: [book.author],
-              coverImage: book.cover,
-              description: book.description,
-              price: book.price,
-              openLibraryKey: '',
-            }}
-          />
-        ))}
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {featuredBooks.map((book, idx) => (
+        <BookCard
+          key={idx}
+          book={{
+            id: `featured-${idx}`,
+            title: book.title,
+            authors: [book.author],
+            coverImage: book.cover,
+            description: book.description,
+            price: book.price,
+            openLibraryKey: '',
+          }}
+        />
+      ))}
     </div>
   );
 } 
