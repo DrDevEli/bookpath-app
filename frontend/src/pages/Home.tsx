@@ -165,14 +165,14 @@ export function Home() {
                         by {book.author}
                       </p>
                       <div className="flex items-center gap-1 mb-1">
-                        <span className="text-xs text-yellow-400 animate-pulse">
+                        <span className="text-xs animate-pulse" style={{ color: 'rgb(250, 204, 21)' }}>
                           {getRatingStars(book.rating)}
                         </span>
-                        <span className="text-xs text-white/60">
+                        <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
                           {book.rating}
                         </span>
                       </div>
-                      <span className="inline-block px-1.5 py-0.5 bg-teal-500/20 text-teal-300 text-[10px] rounded-full border border-teal-400/30 transition-all duration-300 hover:bg-teal-500/30 hover:scale-105">
+                      <span className="inline-block px-1.5 py-0.5 text-[10px] rounded-full transition-all duration-300 hover:scale-105" style={{ backgroundColor: 'rgba(94, 234, 212, 0.2)', color: 'rgb(94, 234, 212)', border: '1px solid rgba(94, 234, 212, 0.3)' }}>
                         {book.genre}
                       </span>
                       {typeof book.price === 'number' && (
@@ -209,49 +209,59 @@ export function Home() {
           </Card>
         </div>
       </div>
-      {/* Add Featured Books section here */}
-      <FeaturedBooks />
-      {/* Main Content */}
-      <div className="mt-8 space-y-8">
-        {/* Centered Logo Before Featured Books */}
-        <div className="flex justify-center mb-2">
+      {/* Featured Books Section */}
+      <section className="mt-12">
+        <h2 className="text-2xl font-bold tracking-tight mb-6 text-center" style={{ color: 'rgb(30, 41, 59)', fontFamily: 'Montserrat, sans-serif' }}>
+          Featured Books
+        </h2>
+        <FeaturedBooks />
+      </section>
+
+      {/* Features Section with Logo */}
+      <section className="mt-12 space-y-6">
+        {/* Centered Logo */}
+        <div className="flex justify-center mb-6">
           <img
-                            src="/bookpath_logo_bordered_golden_updated.webp"
+            src="/bookpath_logo_bordered_golden_updated.webp"
             alt="BookPath Golden Logo"
             className="max-w-[120px] w-full h-auto drop-shadow-lg"
             style={{ filter: 'drop-shadow(0 2px 8px rgba(219, 205, 144, 0.5))' }}
           />
         </div>
-        {/* Featured Books Section */}
-        <section>
-          <h2 className="text-xl font-bold tracking-tight mb-4 text-center" style={{ color: '#dbcd90', marginTop: '0.5rem' }}>Featured Books</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* The featuredBooks array is now managed by FeaturedBooks component */}
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section className="grid gap-2 md:grid-cols-3">
-          <div className="space-y-1">
-            <h3 className="text-base font-bold" style={{ fontFamily: 'Montserrat, sans-serif', color: '#dbcd90' }}>Track Your Reading</h3>
-            <p className="text-xs text-muted-foreground" style={{ fontFamily: 'Open Sans, sans-serif', color: '#dbcd90' }}>
+        
+        {/* Second Featured Books Heading (Golden) */}
+        <h2 className="text-xl font-bold tracking-tight mb-6 text-center" style={{ color: 'rgb(219, 205, 144)', fontFamily: 'Montserrat, sans-serif' }}>
+          Featured Books
+        </h2>
+        
+        {/* Features Grid */}
+        <div className="grid gap-6 md:grid-cols-3 max-w-4xl mx-auto">
+          <div className="space-y-2 text-center">
+            <h3 className="text-base font-bold" style={{ fontFamily: 'Montserrat, sans-serif', color: 'rgb(219, 205, 144)' }}>
+              Track Your Reading
+            </h3>
+            <p className="text-sm" style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgb(30, 41, 59)' }}>
               Keep track of the books you've read and want to read, with a beautiful and intuitive interface.
             </p>
           </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold" style={{ fontFamily: 'Montserrat, sans-serif', color: '#dbcd90' }}>Create Collections</h3>
-            <p className="text-xs text-muted-foreground" style={{ fontFamily: 'Open Sans, sans-serif', color: '#dbcd90' }}>
+          <div className="space-y-2 text-center">
+            <h3 className="text-base font-bold" style={{ fontFamily: 'Montserrat, sans-serif', color: 'rgb(219, 205, 144)' }}>
+              Create Collections
+            </h3>
+            <p className="text-sm" style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgb(30, 41, 59)' }}>
               Organize your books into custom collections, share them, and personalize your reading journey.
             </p>
           </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold" style={{ fontFamily: 'Montserrat, sans-serif', color: '#dbcd90' }}>AI-Powered Discovery</h3>
-            <p className="text-xs text-muted-foreground" style={{ fontFamily: 'Open Sans, sans-serif', color: '#dbcd90' }}>
+          <div className="space-y-2 text-center">
+            <h3 className="text-base font-bold" style={{ fontFamily: 'Montserrat, sans-serif', color: 'rgb(219, 205, 144)' }}>
+              AI-Powered Discovery
+            </h3>
+            <p className="text-sm" style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgb(30, 41, 59)' }}>
               Find your next favorite book with smart recommendations and advanced search powered by AI.
             </p>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 } 
