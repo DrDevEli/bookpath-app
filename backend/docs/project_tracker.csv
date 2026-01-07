@@ -1,0 +1,8 @@
+Task ID,Task Name,Status,Priority,Assigned To,Start Date,Due Date,Completion Date,Estimated Hours,Actual Hours,Cost,Revenue,Profit,Notes
+TASK-001,Initial Project Setup,Completed,High,Team Lead,2024-03-01,2024-03-05,2024-03-05,40,45,4500,0,-4500,Basic project structure and environment setup
+TASK-002,Database Design,Completed,High,Backend Lead,2024-03-05,2024-03-10,2024-03-10,30,35,3500,0,-3500,Schema design and initial migrations
+TASK-003,API Development,In Progress,High,Backend Team,2024-03-10,2024-03-20,,50,,,,,API endpoints and business logic implementation
+TASK-004,Frontend Development,In Progress,High,Frontend Team,2024-03-10,2024-03-25,,60,,,,,User interface and client-side functionality
+TASK-005,Testing Implementation,Not Started,Medium,QA Team,2024-03-20,2024-03-30,,40,,,,,Unit tests and integration testing
+TASK-006,Documentation,Not Started,Medium,Technical Writer,2024-03-25,2024-04-05,,20,,,,,API documentation and user guides
+TASK-007,Deployment Setup,Not Started,High,DevOps,2024-03-30,2024-04-10,,30,,,,,CI/CD pipeline and production environment setup 
