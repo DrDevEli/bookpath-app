@@ -1,5 +1,5 @@
 import { ApiError } from "../utils/errors.js";
-import openLibraryService from "./openLibraryService.js";
+// import openLibraryService from "./openLibraryService.js"; // COMMENTED OUT FOR TESTING - Google Books only
 import logger from "../config/logger.js";
 
 class AdvancedSearchService {
@@ -19,7 +19,7 @@ class AdvancedSearchService {
     page = 1,
   }) {
     if (!title && !author && !genre) {
-      throw new ApiError(400, "At least one search parameter must be provided");
+      throw new ApiError("At least one search parameter must be provided", 400);
     }
 
     try {
@@ -47,11 +47,15 @@ class AdvancedSearchService {
         }
       }
 
-      const result = await openLibraryService.search({ 
-        title: searchTitle, 
-        author: searchAuthor, 
-        page 
-      });
+      // COMMENTED OUT FOR TESTING - Open Library advanced search disabled
+      // const result = await openLibraryService.search({ 
+      //   title: searchTitle, 
+      //   author: searchAuthor, 
+      //   page 
+      // });
+      
+      // Return empty result since Open Library is disabled
+      throw new ApiError("Advanced search is currently disabled. Please use the main search endpoint with Google Books.", 503);
       
       logger.info("Advanced search completed successfully", { 
         resultCount: Array.isArray(result.data) ? result.data.length : 0,

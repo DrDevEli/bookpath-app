@@ -38,13 +38,13 @@ export const authMiddleware = (roles = []) => {
       const token = authHeader?.split(" ")[1];
 
       if (!token) {
-        throw new ApiError(401, "Authorization token required");
+        throw new ApiError("Authorization token required", 401);
       }
 
       // 2. Check blacklist
       const decoded = jwt.decode(token);
       if (await isJwtBlacklisted(decoded.jti)) {
-        throw new ApiError(401, "Token revoked");
+        throw new ApiError("Token revoked", 401);
       }
 
       // 3. Verify token
@@ -56,16 +56,16 @@ export const authMiddleware = (roles = []) => {
       // 4. Check token version
       const user = await User.findById(verified.sub);
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       if (user.tokenVersion > verified.tokenVersion) {
-        throw new ApiError(401, "Token invalidated");
+        throw new ApiError("Token invalidated", 401);
       }
 
       // 5. Role check (if specified)
       if (roles.length && !roles.includes(verified.role)) {
-        throw new ApiError(403, "Insufficient permissions");
+        throw new ApiError("Insufficient permissions", 403);
       }
 
       // 6. Attach user to request
@@ -78,9 +78,9 @@ export const authMiddleware = (roles = []) => {
       next();
     } catch (error) {
       if (error.name === "TokenExpiredError") {
-        next(new ApiError(401, "Token expired"));
+        next(new ApiError("Token expired", 401));
       } else if (error.name === "JsonWebTokenError") {
-        next(new ApiError(401, "Invalid token"));
+        next(new ApiError("Invalid token", 401));
       } else {
         next(error);
       }
@@ -101,7 +101,7 @@ export const csrfProtection = (req, res, next) => {
     const expectedToken = req.cookies["csrf-token"];
 
     if (!csrfToken || !expectedToken || csrfToken !== expectedToken) {
-      throw new ApiError(403, "CSRF token validation failed");
+      throw new ApiError("CSRF token validation failed", 403);
     }
 
     next();
@@ -163,11 +163,11 @@ export const requireVerifiedEmail = async (req, res, next) => {
     const user = await User.findById(req.user.id);
 
     if (!user) {
-      throw new ApiError(404, "User not found");
+      throw new ApiError("User not found", 404);
     }
 
     if (!user.emailVerified) {
-      throw new ApiError(403, "Email verification required");
+      throw new ApiError("Email verification required", 403);
     }
 
     next();

@@ -64,7 +64,7 @@ export async function verifyEmail(token) {
     });
 
     if (!user) {
-      throw new ApiError(400, "Invalid or expired verification token");
+      throw new ApiError("Invalid or expired verification token", 400);
     }
 
     // Mark email as verified and clear token
@@ -98,11 +98,11 @@ export async function resendVerificationEmail(email) {
     const user = await User.findOne({ email });
 
     if (!user) {
-      throw new ApiError(404, "User not found");
+      throw new ApiError("User not found", 404);
     }
 
     if (user.emailVerified) {
-      throw new ApiError(400, "Email is already verified");
+      throw new ApiError("Email is already verified", 400);
     }
 
     // Check if a verification email was sent recently (within 15 minutes)
@@ -120,7 +120,7 @@ export async function resendVerificationEmail(email) {
     const success = await sendVerificationEmail(user);
 
     if (!success) {
-      throw new ApiError(500, "Failed to send verification email");
+      throw new ApiError("Failed to send verification email", 500);
     }
 
     return true;
