@@ -155,6 +155,84 @@ router.get(
 
 /**
  * @swagger
+ * /books/category/{category}:
+ *   get:
+ *     tags: [Books]
+ *     summary: Search books by category
+ *     description: Discover books in a specific category (e.g., History, Fiction, Science)
+ *     parameters:
+ *       - in: path
+ *         name: category
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Category name (e.g., History, Fiction, Sci-Fi, Fantasy, Mystery, Romance, Biography, Self-Help, Business, Tech)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: condition
+ *         schema:
+ *           type: string
+ *         description: Filter by condition (new, used)
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Sort order (newest, author_az)
+ *     responses:
+ *       200:
+ *         description: Books in the specified category
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/definitions/Book'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     currentPage:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     totalResults:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPreviousPage:
+ *                       type: boolean
+ *         headers:
+ *           $ref: '#/definitions/RateLimitHeaders'
+ *       400:
+ *         description: Invalid request - category parameter is required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/definitions/Error'
+ *       429:
+ *         description: Too many requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/definitions/Error'
+ */
+router.get(
+  "/category/:category",
+  rateLimiterMiddleware,
+  BookController.searchByCategory
+);
+
+/**
+ * @swagger
  * /books/author/{authorId}:
  *   get:
  *     tags: [Books]

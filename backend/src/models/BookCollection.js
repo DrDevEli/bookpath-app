@@ -157,7 +157,7 @@ bookCollectionSchema.index({ "books.bookId": 1 });
 bookCollectionSchema.index({ isPublic: 1 });
 bookCollectionSchema.index({ category: 1 });
 bookCollectionSchema.index({ tags: 1 });
-bookCollectionSchema.index({ shareableLink: 1 });
+// shareableLink index is automatically created by unique: true in schema
 bookCollectionSchema.index({ "collaborators.user": 1 });
 bookCollectionSchema.index({ "books.readStatus": 1 });
 bookCollectionSchema.index({ "books.favorite": 1 });

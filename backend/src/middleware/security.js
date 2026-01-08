@@ -23,6 +23,10 @@ export default function securityMiddleware(app) {
   }
 
   // Use Helmet with enhanced security options
+  // In development, allow cross-origin requests from localhost:3000
+  const isDevelopment = config.NODE_ENV === "development";
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -30,25 +34,31 @@ export default function securityMiddleware(app) {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", "'unsafe-inline'"], // Consider removing unsafe-inline in production
           styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", "data:"],
-          connectSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: isDevelopment 
+            ? ["'self'", frontendUrl, "http://localhost:3000", "http://localhost:3001"]
+            : ["'self'"],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
           frameSrc: ["'none'"],
         },
       },
-      crossOriginEmbedderPolicy: true,
-      crossOriginOpenerPolicy: true,
-      crossOriginResourcePolicy: { policy: "same-site" },
+      crossOriginEmbedderPolicy: isDevelopment ? false : true,
+      crossOriginOpenerPolicy: isDevelopment ? false : true,
+      crossOriginResourcePolicy: isDevelopment 
+        ? false 
+        : { policy: "same-site" },
       dnsPrefetchControl: { allow: false },
-      expectCt: { enforce: true, maxAge: 30 },
+      expectCt: isDevelopment ? false : { enforce: true, maxAge: 30 },
       frameguard: { action: "deny" },
-      hsts: {
-        maxAge: 15552000, // 180 days
-        includeSubDomains: true,
-        preload: true,
-      },
+      hsts: isDevelopment 
+        ? false 
+        : {
+            maxAge: 15552000, // 180 days
+            includeSubDomains: true,
+            preload: true,
+          },
       ieNoOpen: true,
       noSniff: true,
       originAgentCluster: true,

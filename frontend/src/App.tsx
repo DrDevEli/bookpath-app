@@ -46,6 +46,7 @@ function App() {
             <Route path="/books/:id" element={<BookDetails />} />
             <Route path="/collections" element={<Collections />} />
             <Route path="/collections/:id" element={<CollectionDetail />} />
+            <Route path="/category" element={<Category />} />
             <Route path="/category/:category" element={<Category />} />
           </Routes>
           </main>

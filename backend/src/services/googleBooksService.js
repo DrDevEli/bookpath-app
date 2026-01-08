@@ -8,18 +8,22 @@ const GOOGLE_BOOKS_API_BASE_URL = "https://www.googleapis.com/books/v1";
  * @param {Object} params - Search parameters
  * @param {string} [params.title] - Book title
  * @param {string} [params.author] - Author name
+ * @param {string} [params.subject] - Subject/category to search for
  * @param {number} [params.page=1] - Page number
  * @returns {Promise<Array>} Array of book objects
  */
-export async function searchGoogleBooks({ title, author, page = 1 }) {
+export async function searchGoogleBooks({ title, author, subject, page = 1 }) {
   try {
-    if (!title && !author) {
-      throw new ApiError("At least one of title or author is required", 400);
+    if (!title && !author && !subject) {
+      throw new ApiError("At least one of title, author, or subject is required", 400);
     }
 
     // Build search query
     let query = "";
-    if (title && author) {
+    if (subject) {
+      // Subject search - Google Books uses "subject:" prefix
+      query = `subject:${encodeURIComponent(subject)}`;
+    } else if (title && author) {
       query = `intitle:${encodeURIComponent(title)}+inauthor:${encodeURIComponent(author)}`;
     } else if (title) {
       query = `intitle:${encodeURIComponent(title)}`;
@@ -56,6 +60,18 @@ export async function searchGoogleBooks({ title, author, page = 1 }) {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        if (response.status === 403) {
+          const errorText = await response.text().catch(() => '');
+          logger.error("Google Books API 403 Forbidden", { 
+            error: errorText,
+            hasApiKey: !!apiKey,
+            apiKeyLength: apiKey ? apiKey.length : 0
+          });
+          throw new ApiError(
+            "Google Books API access denied. Please check API key configuration and restrictions.",
+            403
+          );
+        }
         if (response.status === 429) {
           throw new ApiError("Google Books API rate limit exceeded", 429);
         }

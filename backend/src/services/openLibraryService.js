@@ -10,18 +10,22 @@ class OpenLibraryService {
    * @param {Object} params - Search parameters
    * @param {string} [params.title] - Book title
    * @param {string} [params.author] - Author name
+   * @param {string} [params.subject] - Subject/category to search for
    * @param {number} [params.page=1] - Page number
    * @returns {Promise<Object>} Search results with data and pagination
    */
-  async search({ title, author, page = 1 }) {
+  async search({ title, author, subject, page = 1 }) {
     try {
-      if (!title && !author) {
-        throw new ApiError("At least one of title or author is required", 400);
+      if (!title && !author && !subject) {
+        throw new ApiError("At least one of title, author, or subject is required", 400);
       }
 
       // Build search query
       let query = "";
-      if (title && author) {
+      if (subject) {
+        // Subject search - Open Library uses "subject:" prefix
+        query = `subject:${encodeURIComponent(subject)}`;
+      } else if (title && author) {
         query = `title:${encodeURIComponent(title)} AND author:${encodeURIComponent(author)}`;
       } else if (title) {
         query = `title:${encodeURIComponent(title)}`;

@@ -6,21 +6,26 @@ import logger from "../config/logger.js";
 
 export default class BookSearchService {
   async search({ title, author, page = 1, category, condition, sort }) {
-    if (!title && !author) {
-      throw new ApiError("At least one search parameter must be provided", 400);
+    // Allow category-only searches
+    if (!title && !author && !category) {
+      throw new ApiError("At least one search parameter (title, author, or category) must be provided", 400);
     }
 
     try {
       logger.info("Searching books using multiple APIs", { 
         title, 
         author, 
+        category,
         page
       });
 
+      // Map normalized category to search terms for APIs
+      const subjectSearchTerm = category ? this.mapCategoryToSubject(category) : null;
+
       // Fetch from all sources in parallel
       const [openLibResult, googleResult] = await Promise.allSettled([
-        openLibraryService.search({ title, author, page }),
-        searchGoogleBooks({ title, author, page })
+        openLibraryService.search({ title, author, subject: subjectSearchTerm, page }),
+        searchGoogleBooks({ title, author, subject: subjectSearchTerm, page })
       ]);
 
       // Process results and handle errors gracefully
@@ -172,6 +177,28 @@ export default class BookSearchService {
       if (lower.some((l) => l.includes(entry.key))) return entry.val;
     }
     return undefined;
+  }
+
+  /**
+   * Map normalized category to subject search terms for APIs
+   * @param {string} category - Normalized category (e.g., "History", "Fiction")
+   * @returns {string} Subject search term for APIs
+   */
+  mapCategoryToSubject(category) {
+    const categoryMap = {
+      'Fiction': 'fiction',
+      'Non-fiction': 'nonfiction',
+      'Sci-Fi': 'science fiction',
+      'Fantasy': 'fantasy',
+      'Mystery': 'mystery',
+      'Romance': 'romance',
+      'History': 'history',
+      'Biography': 'biography',
+      'Self-Help': 'self-help',
+      'Business': 'business',
+      'Tech': 'technology',
+    };
+    return categoryMap[category] || category.toLowerCase();
   }
 
   sortBooks(books, sort) {
