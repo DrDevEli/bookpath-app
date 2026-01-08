@@ -45,11 +45,11 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `http://localhost:${config.PORT || 3001}`,
+        url: `http://localhost:${config.PORT || 3001}/api`,
         description: "Development server",
       },
       {
-        url: "https://api.bookpath.eu",
+        url: "https://api.bookpath.eu/api",
         description: "Production server",
       },
     ],

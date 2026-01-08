@@ -68,6 +68,7 @@ const userSchema = new mongoose.Schema({
   keyFingerprint: {
     type: String,
     unique: true,
+    sparse: true,
     match: /^[0-9A-F]{40}$/,
     index: true,
   },
@@ -75,6 +76,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ["free", "pro"],
     default: "free",
+  },
+  role: {
+    type: String,
+    enum: ["user", "admin"],
+    default: "user",
   },
   tokenVersion: { type: Number, default: 0 },
 

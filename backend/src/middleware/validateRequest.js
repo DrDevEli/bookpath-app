@@ -2,7 +2,7 @@ import Joi from "joi";
 import { ApiError } from "../utils/errors.js";
 
 // User validation schemas
-const userSchemas = {
+export const userSchemas = {
   register: Joi.object({
     username: Joi.string().alphanum().min(3).max(30).required(),
     email: Joi.string().email().required(),
@@ -10,7 +10,7 @@ const userSchemas = {
   }),
 
   login: Joi.object({
-    email: Joi.string().email().required(),
+    email: Joi.string().min(1).required(), // Accept email or username (not validated as email format)
     password: Joi.string().required(),
   }),
 
@@ -114,12 +114,8 @@ export const validateRequest = (schema, property = 'body') => {
     });
 
     if (error) {
-      const errorDetails = error.details.map(detail => ({
-        field: detail.path.join('.'),
-        message: detail.message,
-      }));
-
-      throw new ApiError(400, 'Validation error', { details: errorDetails });
+      const errorMessages = error.details.map(detail => detail.message).join(', ');
+      throw new ApiError(`Validation error: ${errorMessages}`, 400);
     }
 
     req[property] = value;

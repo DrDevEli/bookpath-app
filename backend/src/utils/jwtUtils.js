@@ -24,13 +24,15 @@ export const generateTokens = async (
   tokenVersion = Date.now()
 ) => {
   try {
+    // Ensure role has a default value
+    const userRole = role || "user";
     const jti = uuidv4();
 
     // Access token with shorter expiry
     const accessToken = jwt.sign(
       {
         sub: userId,
-        role,
+        role: userRole,
         jti,
         tokenVersion,
       },
@@ -49,7 +51,7 @@ export const generateTokens = async (
     const refreshToken = jwt.sign(
       {
         sub: userId,
-        role,
+        role: userRole,
         jti: uuidv4(),
         tokenVersion,
         type: "refresh",

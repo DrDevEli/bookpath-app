@@ -5,11 +5,20 @@ const TOKEN_KEY = 'auth_token';
 export const login = async (email: string, password: string) => {
   try {
     const response = await api.post('/auth/login', { email, password });
+    console.log('Login response:', response.data); // Debug log
     const { accessToken } = response.data;
+    
+    if (!accessToken) {
+      console.error('No accessToken in response:', response.data);
+      return false;
+    }
+    
     localStorage.setItem(TOKEN_KEY, accessToken);
+    console.log('Token stored successfully'); // Debug log
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login failed:', error);
+    console.error('Error response:', error.response?.data);
     return false;
   }
 };

@@ -18,7 +18,7 @@ class UserController {
 
       // Validate input
       if (!username || !email || !password) {
-        throw new ApiError(400, "Username, email and password are required");
+        throw new ApiError("Username, email and password are required", 400);
       }
 
       // Check if user already exists
@@ -28,8 +28,8 @@ class UserController {
 
       if (existingUser) {
         throw new ApiError(
-          409,
-          "User with this email or username already exists"
+          "User with this email or username already exists",
+          409
         );
       }
 
@@ -83,33 +83,40 @@ class UserController {
 
   static async login(req, res, next) {
     try {
-      const { email, password } = req.body;
+      const { email, username, password } = req.body;
+      
+      // Accept either email or username (for backward compatibility, 'email' field can contain username)
+      const identifier = email || username;
 
       // Validate input
-      if (!email || !password) {
-        throw new ApiError(400, "Email and password are required");
+      if (!identifier || !password) {
+        throw new ApiError("Email/username and password are required", 400);
       }
 
-      // Check login attempts
-      const attempts = await incrementLoginAttempts(email);
+      // Check login attempts (use identifier for rate limiting)
+      const attempts = await incrementLoginAttempts(identifier);
       if (attempts > 5) {
-        logger.warn("Too many login attempts", { email });
-        throw new ApiError(429, "Too many login attempts. Try again later.");
+        logger.warn("Too many login attempts", { identifier });
+        throw new ApiError("Too many login attempts. Try again later.", 429);
       }
 
-      // Find user
-      const user = await User.findOne({ email }).select(
-        "+password +accountLockedUntil"
-      );
+      // Find user by email or username
+      // Treat as email if it contains @, otherwise treat as username
+      const isEmail = identifier.includes('@');
+      const query = isEmail 
+        ? { email: identifier.toLowerCase().trim() } 
+        : { username: identifier.trim() };
+      
+      const user = await User.findOne(query).select("+password +accountLockedUntil");
 
       if (!user) {
-        throw new ApiError(401, "Invalid credentials");
+        throw new ApiError("Invalid credentials", 401);
       }
 
       // Check if account is locked
       if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
         logger.warn("Login attempt on locked account", { userId: user._id });
-        throw new ApiError(403, "Account is locked. Try again later.");
+        throw new ApiError("Account is locked. Try again later.", 403);
       }
 
       // Verify password
@@ -129,11 +136,13 @@ class UserController {
         logger.warn("Failed login attempt - incorrect password", {
           userId: user._id,
         });
-        throw new ApiError(401, "Invalid credentials");
+        throw new ApiError("Invalid credentials", 401);
       }
 
-      // Clear login attempts on successful login
-      await clearLoginAttempts(email);
+      // Clear login attempts on successful login (use both email and username for clearing)
+      await clearLoginAttempts(identifier);
+      await clearLoginAttempts(user.email);
+      await clearLoginAttempts(user.username);
 
       // Check if 2FA is enabled
       if (user.twoFactorEnabled) {
@@ -144,8 +153,9 @@ class UserController {
         });
       }
 
-      // Generate tokens
-      const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+      // Generate tokens (ensure role has a default value)
+      const userRole = user.role || "user";
+      const { accessToken, refreshToken } = await generateTokens(user._id, userRole);
 
       // Log successful login
       const AuditLog = mongoose.model("AuditLog");
@@ -168,12 +178,12 @@ class UserController {
           id: user._id,
           username: user.username,
           email: user.email,
-          role: user.role,
+          role: userRole,
         },
       });
     } catch (error) {
       logger.error("Login error", {
-        email: req.body?.email,
+        identifier: req.body?.email || req.body?.username,
         error: error.message,
       });
       next(error);
