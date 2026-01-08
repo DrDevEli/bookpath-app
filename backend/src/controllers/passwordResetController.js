@@ -88,7 +88,7 @@ export async function resetPassword(token, newPassword) {
     });
 
     if (!user) {
-      throw new ApiError(400, "Invalid or expired reset token");
+      throw new ApiError("Invalid or expired reset token", 400);
     }
 
     // Set new password and clear token

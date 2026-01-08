@@ -199,7 +199,7 @@ class UserController {
       );
 
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       res.status(200).json({
@@ -259,7 +259,7 @@ class UserController {
 
       // Validate input
       if (!username && !email) {
-        throw new ApiError(400, "At least one field must be provided");
+        throw new ApiError("At least one field must be provided", 400);
       }
 
       // Build update object
@@ -274,7 +274,7 @@ class UserController {
       });
 
       if (!updatedUser) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       logger.info("User profile updated", { userId });
@@ -311,7 +311,7 @@ class UserController {
       // Get user with password
       const user = await User.findById(userId).select("+password");
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       // Verify current password
@@ -321,7 +321,7 @@ class UserController {
           "Failed password change attempt - incorrect current password",
           { userId }
         );
-        throw new ApiError(401, "Current password is incorrect");
+        throw new ApiError("Current password is incorrect", 401);
       }
 
       // Check if new password is the same as current
@@ -374,7 +374,7 @@ class UserController {
       const user = await User.findById(userId).select("preferences");
 
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       res.status(200).json({
@@ -396,7 +396,7 @@ class UserController {
       const { preferences } = req.body;
 
       if (!preferences || typeof preferences !== "object") {
-        throw new ApiError(400, "Valid preferences object is required");
+        throw new ApiError("Valid preferences object is required", 400);
       }
 
       const updatedUser = await User.findByIdAndUpdate(
@@ -406,7 +406,7 @@ class UserController {
       );
 
       if (!updatedUser) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       logger.info("User preferences updated", { userId });

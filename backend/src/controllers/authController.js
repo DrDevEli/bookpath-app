@@ -36,7 +36,7 @@ class AuthController {
       const { email } = req.body;
 
       if (!email) {
-        throw new ApiError(400, "Email is required");
+        throw new ApiError("Email is required", 400);
       }
 
       // Use the password reset controller to handle the request
@@ -68,7 +68,7 @@ class AuthController {
       const { token, newPassword } = req.body;
 
       if (!token || !newPassword) {
-        throw new ApiError(400, "Token and new password are required");
+        throw new ApiError("Token and new password are required", 400);
       }
 
       // Use the password reset controller to handle the reset
@@ -153,7 +153,7 @@ class AuthController {
       const user = await User.findById(userId).select("+twoFactorSecret");
 
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       // Verify token using speakeasy
@@ -166,7 +166,7 @@ class AuthController {
 
       if (!verified) {
         logger.warn("Failed 2FA verification attempt", { userId });
-        throw new ApiError(400, "Invalid verification code");
+        throw new ApiError("Invalid verification code", 400);
       }
 
       // Enable 2FA
@@ -200,12 +200,12 @@ class AuthController {
       const { token, userId } = req.body;
 
       if (!token || !userId) {
-        throw new ApiError(400, "Verification code and user ID are required");
+        throw new ApiError("Verification code and user ID are required", 400);
       }
 
       const user = await User.findById(userId).select("+twoFactorSecret");
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       // Verify token using speakeasy
@@ -218,7 +218,7 @@ class AuthController {
 
       if (!verified) {
         logger.warn("Failed 2FA login attempt", { userId });
-        throw new ApiError(401, "Invalid verification code");
+        throw new ApiError("Invalid verification code", 400);
       }
 
       // Generate tokens
@@ -280,7 +280,7 @@ class AuthController {
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
-        throw new ApiError(400, "Refresh token is required");
+        throw new ApiError("Refresh token is required", 400);
       }
 
       // Verify refresh token
@@ -290,7 +290,7 @@ class AuthController {
 
       // Check if token is blacklisted
       if (await isJwtBlacklisted(decoded.jti)) {
-        throw new ApiError(401, "Token revoked");
+        throw new ApiError("Token revoked", 401);
       }
 
       // Generate new tokens
@@ -317,9 +317,9 @@ class AuthController {
       });
     } catch (error) {
       if (error.name === "TokenExpiredError") {
-        next(new ApiError(401, "Refresh token expired"));
+        next(new ApiError("Refresh token expired", 401));
       } else if (error.name === "JsonWebTokenError") {
-        next(new ApiError(401, "Invalid refresh token"));
+        next(new ApiError("Invalid refresh token", 401));
       } else {
         next(error);
       }
@@ -394,7 +394,7 @@ class AuthController {
 
       const user = await User.findById(userId);
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       if (user.emailVerified) {
@@ -435,13 +435,13 @@ class AuthController {
       const userId = req.user.id;
 
       if (!password) {
-        throw new ApiError(400, "Password is required to disable 2FA");
+        throw new ApiError("Password is required to disable 2FA", 400);
       }
 
       const user = await User.findById(userId).select("+password");
 
       if (!user) {
-        throw new ApiError(404, "User not found");
+        throw new ApiError("User not found", 404);
       }
 
       // Verify password
@@ -450,7 +450,7 @@ class AuthController {
         logger.warn("Failed 2FA disable attempt - incorrect password", {
           userId,
         });
-        throw new ApiError(401, "Invalid password");
+        throw new ApiError("Invalid password", 401);
       }
 
       // Disable 2FA

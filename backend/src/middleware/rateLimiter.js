@@ -85,7 +85,7 @@ export const rateLimiterMiddleware = async (req, res, next) => {
         });
     } else {
       logger.error("Rate limiting error", { error: error.message });
-      next(new ApiError(500, "Rate limiting error"));
+      next(new ApiError("Rate limiting error", 500));
     }
   }
 };

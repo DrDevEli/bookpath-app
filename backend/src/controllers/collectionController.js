@@ -9,7 +9,7 @@ class CollectionController {
       const userId = req.user.id;
 
       if (!name) {
-        throw new ApiError(400, "Collection name is required");
+        throw new ApiError("Collection name is required", 400);
       }
 
       // Check if collection with same name already exists for this user
@@ -18,7 +18,7 @@ class CollectionController {
         name,
       });
       if (existingCollection) {
-        throw new ApiError(400, "Collection with this name already exists");
+        throw new ApiError("Collection with this name already exists", 400);
       }
 
       const newCollection = await BookCollection.create({
@@ -85,7 +85,7 @@ class CollectionController {
       });
 
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       res.status(200).json({
@@ -128,7 +128,7 @@ class CollectionController {
       const userId = req.user.id;
 
       if (!bookId || !title) {
-        throw new ApiError(400, "Book ID and title are required");
+        throw new ApiError("Book ID and title are required", 400);
       }
 
       const collection = await BookCollection.findOne({
@@ -136,7 +136,7 @@ class CollectionController {
         user: userId,
       });
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       // Check if book already exists in collection
@@ -144,7 +144,7 @@ class CollectionController {
         (book) => book.bookId === bookId
       );
       if (bookExists) {
-        throw new ApiError(400, "Book already exists in this collection");
+        throw new ApiError("Book already exists in this collection", 400);
       }
 
       const bookData = {
@@ -212,14 +212,14 @@ class CollectionController {
         user: userId,
       });
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       const bookIndex = collection.books.findIndex(
         (book) => book.bookId === bookId
       );
       if (bookIndex === -1) {
-        throw new ApiError(404, "Book not found in collection");
+        throw new ApiError("Book not found in collection", 404);
       }
 
       // Update only the provided fields
@@ -267,14 +267,14 @@ class CollectionController {
         user: userId,
       });
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       const bookIndex = collection.books.findIndex(
         (book) => book.bookId === bookId
       );
       if (bookIndex === -1) {
-        throw new ApiError(404, "Book not found in collection");
+        throw new ApiError("Book not found in collection", 404);
       }
 
       collection.books.splice(bookIndex, 1);
@@ -315,7 +315,7 @@ class CollectionController {
       });
 
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       // Update fields if provided
@@ -360,7 +360,7 @@ class CollectionController {
       });
 
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       await BookCollection.deleteOne({ _id: id });
@@ -420,7 +420,7 @@ class CollectionController {
       });
 
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       const shareableLink = collection.generateShareableLink();
@@ -458,7 +458,7 @@ class CollectionController {
       }).populate('user', 'username email');
 
       if (!collection) {
-        throw new ApiError(404, "Shared collection not found or not public");
+        throw new ApiError("Shared collection not found or not public", 404);
       }
 
       res.status(200).json({
@@ -485,7 +485,7 @@ class CollectionController {
       });
 
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       // Update stats before returning
@@ -534,7 +534,7 @@ class CollectionController {
       });
 
       if (!collection) {
-        throw new ApiError(404, "Collection not found or access denied");
+        throw new ApiError("Collection not found or access denied", 404);
       }
 
       let books = collection.books;

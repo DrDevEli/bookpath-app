@@ -15,6 +15,7 @@ interface Book {
   ratingsCount?: number;
   openLibraryKey?: string;
   price?: number;
+  currencyCode?: string;
   condition?: 'new' | 'used' | 'unknown';
   category?: string;
   description?: string;
@@ -116,9 +117,11 @@ export function BookCard({
         <div className="font-semibold text-lg mb-1 line-clamp-2 group-hover:opacity-80 transition-opacity duration-300" title={book.title} style={{ color: 'rgb(30, 41, 59)' }}>
           {book.title}
         </div>
-        <div className="text-sm mb-2 line-clamp-1" title={book.authors.join(', ')} style={{ color: 'rgb(30, 41, 59)' }}>
-          by {book.authors.join(', ')}
-        </div>
+        {book.authors && book.authors.length > 0 && (
+          <div className="text-sm mb-2 line-clamp-1" title={book.authors.join(', ')} style={{ color: 'rgb(30, 41, 59)' }}>
+            by {book.authors.join(', ')}
+          </div>
+        )}
         
         {book.description && (
           <div className="text-xs mb-2 line-clamp-3" title={book.description} style={{ color: 'rgb(30, 41, 59)' }}>
@@ -180,7 +183,7 @@ export function BookCard({
         {/* Price Tag */}
         {typeof book.price === 'number' && (
           <span className="inline-block mb-3 px-2 py-0.5 bg-gradient-to-r from-yellow-200 via-yellow-300 to-yellow-400 text-yellow-900 text-xs font-bold rounded-full shadow-sm border border-yellow-300">
-            ${book.price.toFixed(2)}
+            {book.currencyCode === 'USD' ? '$' : book.currencyCode || '$'}{book.price.toFixed(2)}
           </span>
         )}
         {book.condition && book.condition !== 'unknown' && (

@@ -404,13 +404,24 @@ class OpenLibraryService {
     // Extract Open Library key
     const openLibraryKey = doc.key?.replace("/works/", "") || null;
 
+    // Try to extract description from search result if available
+    let description = null;
+    if (doc.first_sentence) {
+      // Open Library sometimes includes first_sentence in search results
+      if (Array.isArray(doc.first_sentence)) {
+        description = doc.first_sentence.join(' ');
+      } else if (typeof doc.first_sentence === 'string') {
+        description = doc.first_sentence;
+      }
+    }
+
     return {
       id: doc.key || null,
       openLibraryKey,
       title: doc.title || "Unknown Title",
       authors: authorNames,
       authorNames, // Alias for compatibility
-      description: null, // Description not available in search results
+      description, // May be null if not available in search results
       coverImage,
       firstPublishYear,
       subjects: normalizedSubjects,
@@ -423,6 +434,41 @@ class OpenLibraryService {
       genres: normalizedSubjects,
       category: normalizedSubjects[0] || null,
     };
+  }
+
+  /**
+   * Enrich a book object with description from Open Library work details
+   * @param {Object} book - Book object that may be missing description
+   * @returns {Promise<Object>} Book object with description if available
+   */
+  async enrichWithDescription(book) {
+    // If book already has description, return as is
+    if (book.description) {
+      return book;
+    }
+
+    // If book has an Open Library key, try to fetch description
+    if (book.openLibraryKey || book.id) {
+      try {
+        const workId = book.openLibraryKey || book.id;
+        const workDetails = await this.getBookDetails(workId);
+        
+        // Return book with description from work details
+        return {
+          ...book,
+          description: workDetails.description || book.description,
+        };
+      } catch (error) {
+        // If fetching fails, return book as is
+        logger.warn("Failed to enrich book with description from Open Library", {
+          bookId: book.id,
+          error: error.message,
+        });
+        return book;
+      }
+    }
+
+    return book;
   }
 }
 

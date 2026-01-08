@@ -116,6 +116,95 @@ export async function searchGoogleBooks({ title, author, subject, page = 1 }) {
 }
 
 /**
+ * Get a single book by Google Books volume ID
+ * @param {string} volumeId - Google Books volume ID (without 'google-' prefix)
+ * @returns {Promise<Object>} Book object
+ */
+export async function getGoogleBookById(volumeId) {
+  try {
+    if (!volumeId) {
+      throw new ApiError("Volume ID is required", 400);
+    }
+
+    // Build URL with optional API key
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    let url = `${GOOGLE_BOOKS_API_BASE_URL}/volumes/${encodeURIComponent(volumeId)}`;
+    
+    if (apiKey) {
+      url += `?key=${apiKey}`;
+    }
+
+    logger.info("Fetching Google Book by ID", { volumeId });
+
+    // Make request with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "BookPath/1.0 (https://bookpath.eu)",
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new ApiError("Book not found in Google Books", 404);
+        }
+        if (response.status === 403) {
+          const errorText = await response.text().catch(() => '');
+          logger.error("Google Books API 403 Forbidden", { 
+            error: errorText,
+            hasApiKey: !!apiKey,
+            apiKeyLength: apiKey ? apiKey.length : 0
+          });
+          throw new ApiError(
+            "Google Books API access denied. Please check API key configuration and restrictions.",
+            403
+          );
+        }
+        if (response.status === 429) {
+          throw new ApiError("Google Books API rate limit exceeded", 429);
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Transform Google Books result to our format
+      const book = transformGoogleBook(data);
+
+      logger.info("Google Book fetch successful", { volumeId, title: book.title });
+
+      return book;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error) {
+    logger.error("Google Books fetch by ID error", {
+      error: error.message,
+      volumeId,
+    });
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    if (error.name === "AbortError") {
+      throw new ApiError("Google Books API request timed out", 504);
+    }
+
+    throw new ApiError(
+      `Failed to fetch Google Book: ${error.message}`,
+      500
+    );
+  }
+}
+
+/**
  * Transform Google Books API item to our book format
  * @param {Object} item - Google Books API volume item
  * @returns {Object} Transformed book object
@@ -172,6 +261,20 @@ function transformGoogleBook(item) {
   const averageRating = volumeInfo.averageRating || null;
   const ratingsCount = volumeInfo.ratingsCount || 0;
 
+  // Extract price information
+  let price = null;
+  let currencyCode = null;
+  if (saleInfo.saleability === 'FOR_SALE' || saleInfo.saleability === 'FOR_PREORDER') {
+    // Prefer retail price (discounted price) over list price
+    if (saleInfo.retailPrice?.amount) {
+      price = saleInfo.retailPrice.amount;
+      currencyCode = saleInfo.retailPrice.currencyCode || 'USD';
+    } else if (saleInfo.listPrice?.amount) {
+      price = saleInfo.listPrice.amount;
+      currencyCode = saleInfo.listPrice.currencyCode || 'USD';
+    }
+  }
+
   // Build Google Books ID (prefixed to avoid conflicts)
   const googleId = item.id ? `google-${item.id}` : null;
 
@@ -200,6 +303,9 @@ function transformGoogleBook(item) {
     // Sale info
     isEbook: saleInfo.isEbook || false,
     saleability: saleInfo.saleability || null,
+    price: price,
+    currencyCode: currencyCode,
+    buyLink: saleInfo.buyLink || null,
     // Access info
     hasFullText: accessInfo.text || false,
     // Source identifier
@@ -209,4 +315,5 @@ function transformGoogleBook(item) {
 
 export default {
   searchGoogleBooks,
+  getGoogleBookById,
 };

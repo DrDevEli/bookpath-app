@@ -13,18 +13,24 @@ import { isAuthenticated } from '../auth';
 interface Book {
   id: string;
   title: string;
-  authors: string[];
+  authors?: string[];
   description?: string;
   coverImage?: string;
   firstPublishYear?: number;
   editionCount?: number;
   ratingsAverage?: number;
   ratingsCount?: number;
-  openLibraryKey: string;
+  openLibraryKey?: string;
   subjects?: string[];
   languages?: string[];
   publishers?: string[];
   amazonLink?: string;
+  isbn?: string;
+  canonicalVolumeLink?: string;
+  infoLink?: string;
+  previewLink?: string;
+  price?: number;
+  currencyCode?: string;
 }
 
 interface Collection {
@@ -109,7 +115,7 @@ export function BookDetails() {
       const response = await api.post(`/collections/${data.collectionId}/books`, {
         bookId: book.id,
         title: book.title,
-        authors: book.authors,
+        authors: book.authors || [],
         coverImage: book.coverImage,
         notes: data.notes,
         readStatus: data.readStatus,
@@ -132,6 +138,48 @@ export function BookDetails() {
   const getRatingStars = (rating?: number) => {
     if (!rating) return 'No rating';
     return '⭐'.repeat(Math.round(rating)) + '☆'.repeat(5 - Math.round(rating));
+  };
+
+  const getGoodreadsUrl = (book: Book): string => {
+    // Prefer ISBN if available for more accurate results
+    if (book.isbn) {
+      return `https://www.goodreads.com/search?q=${encodeURIComponent(book.isbn)}`;
+    }
+    // Build search query with title and author(s)
+    let searchQuery = book.title;
+    if (book.authors && book.authors.length > 0) {
+      // Include all authors for better matching
+      const authors = book.authors.join(' ');
+      searchQuery += ` ${authors}`;
+    }
+    return `https://www.goodreads.com/search?q=${encodeURIComponent(searchQuery)}`;
+  };
+
+  const getGoogleSearchUrl = (book: Book): string => {
+    // Build a comprehensive book search query
+    // Format: "book title" author ISBN (if available)
+    let searchQuery = '';
+    
+    // Always include title
+    if (book.title) {
+      searchQuery += `"${book.title}"`;
+    }
+    
+    // Add author(s) if available
+    if (book.authors && book.authors.length > 0) {
+      const authors = book.authors.join(' ');
+      searchQuery += ` ${authors}`;
+    }
+    
+    // Add ISBN if available for precise book identification
+    if (book.isbn) {
+      searchQuery += ` ISBN ${book.isbn}`;
+    }
+    
+    // Add "book" keyword to help Google understand it's a book search
+    searchQuery += ' book';
+    
+    return `https://www.google.com/search?q=${encodeURIComponent(searchQuery.trim())}`;
   };
 
   const handleBuyClick = async () => {
@@ -245,9 +293,11 @@ export function BookDetails() {
                   <h1 className="text-2xl font-bold mb-2" style={{ color: '#dbcd90' }}>
                     {book.title}
                   </h1>
-                  <p className="text-lg text-muted-foreground">
-                    by {book.authors.join(', ')}
-                  </p>
+                  {book.authors && book.authors.length > 0 && (
+                    <p className="text-lg text-muted-foreground">
+                      by {book.authors.join(', ')}
+                    </p>
+                  )}
                 </div>
 
                 {book.ratingsAverage && (
@@ -389,7 +439,7 @@ export function BookDetails() {
               </Card>
             )}
 
-            {book.openLibraryKey && (
+            {book.title && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">External Links</CardTitle>
@@ -397,12 +447,21 @@ export function BookDetails() {
                 <CardContent>
                   <div className="space-y-2">
                     <a
-                      href={`https://openlibrary.org${book.openLibraryKey}`}
+                      href={getGoogleSearchUrl(book)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline text-sm flex items-center gap-2"
                     >
-                      <span>View on Open Library</span>
+                      <span>Search on Google</span>
+                      <span>↗</span>
+                    </a>
+                    <a
+                      href={getGoodreadsUrl(book)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline text-sm flex items-center gap-2"
+                    >
+                      <span>View on Goodreads</span>
                       <span>↗</span>
                     </a>
                   </div>
