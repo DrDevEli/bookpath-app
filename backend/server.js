@@ -76,13 +76,15 @@ securityMiddleware(app);
 
 // Configure CORS
 const corsOptions = {
-  origin: process.env.NODE_ENV === "production" 
+  origin: config.NODE_ENV === "production" 
     ? ["https://www.bookpath.eu", "https://bookpath.eu", "https://api.bookpath.eu"]
-    : "http://localhost:3000",
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+    : ["http://localhost:3000", "http://127.0.0.1:3000"], // Allow both localhost variants
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-Requested-With"],
   credentials: true,
   maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 };
 app.use(cors(corsOptions));
 
