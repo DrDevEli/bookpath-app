@@ -13,14 +13,19 @@ import {
 passport.use(
   new LocalStrategy(
     {
-      usernameField: "email",
+      usernameField: "email", // Can accept email or username
       passwordField: "password",
     },
-    async (email, password, done) => {
+    async (identifier, password, done) => {
       try {
-        const user = await User.findOne({ email }).select("+password");
+        // Determine if identifier is email or username
+        const isEmail = identifier.includes('@');
+        const user = await User.findOne(
+          isEmail ? { email: identifier.toLowerCase() } : { username: identifier }
+        ).select("+password");
+        
         if (!user)
-          return done(null, false, { message: "Incorrect email or password" });
+          return done(null, false, { message: "Incorrect email/username or password" });
 
         if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
           return done(null, false, {
@@ -28,7 +33,7 @@ passport.use(
           });
         }
 
-        const attempts = await incrementLoginAttempts(email);
+        const attempts = await incrementLoginAttempts(identifier);
 
         if (attempts >= 5) {
           const lockUntil = await lockUserAccount(user._id);
@@ -39,10 +44,12 @@ passport.use(
 
         const isMatch = await user.comparePassword(password);
         if (!isMatch)
-          return done(null, false, { message: "Incorrect email or password" });
+          return done(null, false, { message: "Incorrect email/username or password" });
 
-        // Successful login resets attempts
-        await clearLoginAttempts(email);
+        // Successful login resets attempts (clear both email and username)
+        await clearLoginAttempts(identifier);
+        await clearLoginAttempts(user.email);
+        await clearLoginAttempts(user.username);
 
         return done(null, user);
       } catch (error) {

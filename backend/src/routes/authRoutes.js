@@ -1,7 +1,7 @@
 import express from "express";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
-import { validateRequest } from "../middleware/validateRequest.js";
+import { validateRequest, validateUserLogin } from "../middleware/validateRequest.js";
 import { rateLimiterMiddleware } from "../middleware/rateLimiter.js";
 
 const publicResendLimiter = rateLimit({
@@ -30,6 +30,7 @@ import {
 
 // Utils
 import { generateTokens } from "../utils/jwtUtils.js";
+import logger from "../config/logger.js";
 
 const router = express.Router();
 
@@ -83,7 +84,7 @@ router.post(
  *   post:
  *     tags: [Auth]
  *     summary: Login user
- *     description: Authenticate user and return JWT token
+ *     description: Authenticate user with email or username and return JWT token
  *     requestBody:
  *       required: true
  *       content:
@@ -96,7 +97,8 @@ router.post(
  *             properties:
  *               email:
  *                 type: string
- *                 format: email
+ *                 description: User's email address or username
+ *                 example: "user@example.com"
  *               password:
  *                 type: string
  *                 format: password
@@ -118,7 +120,7 @@ router.post(
 router.post(
   "/login",
   rateLimiterMiddleware,
-  validateRequest,
+  validateUserLogin,
   UserController.login
 );
 
@@ -259,48 +261,6 @@ router.get("/csrf-token", generateCsrfToken, (req, res) => {
   });
 });
 
-// Login route
-router.post(
-  "/login",
-  passport.authenticate("local", { session: false }),
-  (req, res) => {
-    // Check if 2FA is enabled
-    if (req.user.twoFactorEnabled) {
-      return res.status(200).json({
-        success: true,
-        message: "Two-factor authentication required",
-        data: {
-          userId: req.user._id,
-          requiresTwoFactor: true,
-        },
-      });
-    }
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(
-      req.user._id,
-      req.user.role
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Login successful",
-      data: {
-        user: {
-          id: req.user._id,
-          username: req.user.username,
-          email: req.user.email,
-          role: req.user.role,
-        },
-        tokens: {
-          accessToken,
-          refreshToken,
-        },
-      },
-    });
-  }
-);
-
 // OAuth routes
 router.get(
   "/google",
@@ -315,17 +275,22 @@ router.get(
     failureRedirect: "/login",
     session: false,
   }),
-  (req, res) => {
-    // Generate JWT tokens
-    const { accessToken, refreshToken } = generateTokens(
-      req.user._id,
-      req.user.role
-    );
+  async (req, res) => {
+    try {
+      // Generate JWT tokens
+      const { accessToken, refreshToken } = await generateTokens(
+        req.user._id,
+        req.user.role
+      );
 
-    // Redirect to frontend with tokens
-    res.redirect(
-      `${process.env.FRONTEND_URL}/oauth-callback?token=${accessToken}&refresh=${refreshToken}`
-    );
+      // Redirect to frontend with tokens
+      res.redirect(
+        `${process.env.FRONTEND_URL}/oauth-callback?token=${accessToken}&refresh=${refreshToken}`
+      );
+    } catch (error) {
+      logger.error("OAuth callback error", { error: error.message });
+      res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed`);
+    }
   }
 );
 
