@@ -353,6 +353,66 @@ router.get(
 
 /**
  * @swagger
+ * /books/{id}/affiliate-click:
+ *   get:
+ *     tags: [Books]
+ *     summary: Track affiliate click and get affiliate URL (alias)
+ *     description: Alias for /books/{id}/affiliate endpoint. Track when a user clicks on an affiliate link and return the affiliate URL for a book
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *     responses:
+ *       200:
+ *         description: Affiliate URL generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     affiliateUrl:
+ *                       type: string
+ *                       format: uri
+ *                       description: Amazon affiliate link for the book
+ *                     bookId:
+ *                       type: string
+ *         headers:
+ *           $ref: '#/definitions/RateLimitHeaders'
+ *       404:
+ *         description: Book not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/definitions/Error'
+ *       500:
+ *         description: Affiliate link not available
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/definitions/Error'
+ *       429:
+ *         description: Too many requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/definitions/Error'
+ */
+router.get(
+  "/:id/affiliate-click",
+  rateLimiterMiddleware,
+  BookController.trackAffiliateClick
+);
+
+/**
+ * @swagger
  * /books/{id}:
  *   get:
  *     tags: [Books]

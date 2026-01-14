@@ -242,7 +242,7 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Start server regardless of MongoDB connection status
-const startServer = () => {
+const startServer = async () => {
   const server = app.listen(PORT, () => {
     logger.info(`Server running in ${config.NODE_ENV} mode on port ${PORT}`);
     logger.info(
@@ -255,12 +255,27 @@ const startServer = () => {
   server.keepAliveTimeout = 65000; // 65 seconds
   server.headersTimeout = 66000; // 66 seconds (slightly more than keepAliveTimeout)
 
+  // Initialize featured books cache in the background (non-blocking)
+  try {
+    const featuredBooksService = (await import("./src/services/featuredBooksService.js")).default;
+    // Run initialization asynchronously without blocking server start
+    featuredBooksService.initializeFeaturedBooks().catch((error) => {
+      logger.error("Failed to initialize featured books cache", {
+        error: error.message,
+      });
+    });
+  } catch (error) {
+    logger.warn("Could not initialize featured books service", {
+      error: error.message,
+    });
+  }
+
   return server;
 };
 (async () => {
   const connected = await connectWithRetry();
   if (connected) {
-    startServer();
+    await startServer();
   } else {
     logger.error("Could not start server due to MongoDB connection failure");
     process.exit(1);
