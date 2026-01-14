@@ -3,6 +3,7 @@ import advancedSearchService from "../services/advancedSearchService.js";
 // import openLibraryService from "../services/openLibraryService.js"; // COMMENTED OUT FOR TESTING - Google Books only
 import { getGoogleBookById } from "../services/googleBooksService.js";
 import amazonAffiliateService from "../services/amazonAffiliateService.js";
+import featuredBooksService from "../services/featuredBooksService.js";
 import { ApiError } from "../utils/errors.js";
 import redis from "../config/redis.js";
 import logger from "../config/logger.js";
@@ -67,12 +68,64 @@ class BookController {
       
       // Handle featured book IDs (frontend-generated IDs like "featured-2")
       if (id.startsWith('featured-')) {
-        logger.warn("Featured book ID requested - these are frontend-only IDs", { bookId: id });
-        return res.status(404).json({ 
-          success: false, 
-          error: "Featured books are display-only. Please search for the book to view details.",
-          message: "Featured books are display-only. Please search for the book to view details."
+        logger.info("Featured book ID requested", { bookId: id });
+        
+        // Get the featured book index
+        const featuredIndex = featuredBooksService.getFeaturedBookIndex(id);
+        
+        if (featuredIndex === null) {
+          logger.warn("Invalid featured book index", { bookId: id });
+          return res.status(404).json({ 
+            success: false, 
+            error: "Invalid featured book ID.",
+            message: "Invalid featured book ID."
+          });
+        }
+
+        // Get cached featured book
+        const cachedBook = await featuredBooksService.getCachedFeaturedBook(featuredIndex);
+        
+        if (!cachedBook) {
+          logger.warn("Featured book not found in cache", { bookId: id, index: featuredIndex });
+          return res.status(404).json({ 
+            success: false, 
+            error: "Featured book not found. Please try again later.",
+            message: "Featured book not found. Please try again later."
+          });
+        }
+
+        // Add Amazon affiliate link if not already present
+        let amazonLink = cachedBook.amazonLink;
+        if (!amazonLink) {
+          try {
+            amazonLink = await amazonAffiliateService.generateAffiliateLink({
+              title: cachedBook.title,
+              authors: cachedBook.authors || cachedBook.authorNames || []
+            });
+          } catch (error) {
+            logger.warn("Failed to generate affiliate link for featured book", {
+              bookId: id,
+              error: error.message
+            });
+          }
+        }
+
+        // Prepare book data with affiliate link
+        const bookWithAffiliate = {
+          ...cachedBook,
+          amazonLink: amazonLink || cachedBook.amazonLink || null,
+          ratingsAverage: cachedBook.averageRating || cachedBook.ratingsAverage,
+          languages: cachedBook.language ? [cachedBook.language] : (cachedBook.languages || []),
+          publishers: cachedBook.publisher ? [cachedBook.publisher] : (cachedBook.publishers || []),
+        };
+
+        logger.info("Featured book retrieved successfully", { 
+          bookId: id, 
+          index: featuredIndex,
+          title: bookWithAffiliate.title 
         });
+
+        return res.status(200).json({ success: true, data: bookWithAffiliate });
       }
       
       // Handle Google Books IDs

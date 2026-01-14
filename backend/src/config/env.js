@@ -36,6 +36,15 @@ const env = cleanEnv(process.env, {
     default: "http://localhost:3000",
     desc: "Base URL for frontend (used for CORS, etc)",
   }),
+  // Amazon Associates (Optional - for affiliate links)
+  AMAZON_ASSOCIATES_TAG: str({
+    default: "",
+    desc: "Amazon Associates affiliate tag (e.g., 'yourstore-20')",
+  }),
+  AMAZON_DOMAIN: str({
+    default: "amazon.de",
+    desc: "Amazon domain for affiliate links (e.g., 'amazon.com', 'amazon.de', 'amazon.co.uk')",
+  }),
 });
 
 export default env;

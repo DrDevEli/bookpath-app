@@ -25,6 +25,7 @@ interface Book {
   languages?: string[];
   publishers?: string[];
   amazonLink?: string;
+  buyLink?: string;
   isbn?: string;
   canonicalVolumeLink?: string;
   infoLink?: string;
@@ -185,6 +186,12 @@ export function BookDetails() {
   const handleBuyClick = async () => {
     if (!book?.id) return;
     
+    // Prioritize Google Books buyLink (direct purchase link)
+    if (book.buyLink) {
+      window.open(book.buyLink, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
     try {
       setLoadingAffiliate(true);
       // Track click and get affiliate URL
@@ -197,7 +204,7 @@ export function BookDetails() {
         // Fallback to direct link if available
         window.open(book.amazonLink, '_blank', 'noopener,noreferrer');
       } else {
-        setError('Affiliate link not available');
+        setError('Purchase link not available');
       }
     } catch (err: any) {
       console.error('Error getting affiliate link:', err);
@@ -333,28 +340,32 @@ export function BookDetails() {
                 )}
 
                 {/* Buy Button */}
-                <div className="mt-6">
-                  <Button
-                    onClick={handleBuyClick}
-                    disabled={loadingAffiliate}
-                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold py-3 text-lg shadow-lg"
-                  >
-                    {loadingAffiliate ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        Loading...
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span>🛒</span>
-                        <span>Buy on Amazon</span>
-                      </div>
+                {(book.buyLink || book.amazonLink) && (
+                  <div className="mt-6">
+                    <Button
+                      onClick={handleBuyClick}
+                      disabled={loadingAffiliate}
+                      className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold py-3 text-lg shadow-lg"
+                    >
+                      {loadingAffiliate ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          Loading...
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span>🛒</span>
+                          <span>{book.buyLink ? 'Purchase Book' : 'Buy on Amazon'}</span>
+                        </div>
+                      )}
+                    </Button>
+                    {!book.buyLink && (
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        As an Amazon Associate, we earn from qualifying purchases.
+                      </p>
                     )}
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
-                    As an Amazon Associate, we earn from qualifying purchases.
-                  </p>
-                </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
