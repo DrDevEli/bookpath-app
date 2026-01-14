@@ -32,3 +32,6 @@ jspm_packages/
 
 # Git backups
 .git.backup
+
+# Documentation
+docs/
