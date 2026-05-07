@@ -262,6 +262,14 @@ class UserController {
         throw new ApiError("At least one field must be provided", 400);
       }
 
+      // Ensure untrusted values are treated as literals, not query/update objects
+      if (username !== undefined && typeof username !== "string") {
+        throw new ApiError("Username must be a string", 400);
+      }
+      if (email !== undefined && typeof email !== "string") {
+        throw new ApiError("Email must be a string", 400);
+      }
+
       // Build update object
       const updateData = {};
       if (username) updateData.username = username;
