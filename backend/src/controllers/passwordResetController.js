@@ -12,7 +12,7 @@ import { cache } from "../utils/cache.js";
  */
 export async function requestPasswordReset(email) {
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: { $eq: email } });
 
     if (!user) {
       // Don't reveal that the user doesn't exist
