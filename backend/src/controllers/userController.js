@@ -395,7 +395,32 @@ class UserController {
       const userId = req.user.id;
       const { preferences } = req.body;
 
-      if (!preferences || typeof preferences !== "object") {
+      const isPlainObject = (value) =>
+        Object.prototype.toString.call(value) === "[object Object]";
+
+      const hasUnsafeKeys = (obj) => {
+        if (Array.isArray(obj)) {
+          return obj.some((item) => isPlainObject(item) && hasUnsafeKeys(item));
+        }
+        if (!isPlainObject(obj)) {
+          return false;
+        }
+
+        for (const [key, value] of Object.entries(obj)) {
+          if (key.startsWith("$") || key.includes(".")) {
+            return true;
+          }
+          if (
+            (isPlainObject(value) || Array.isArray(value)) &&
+            hasUnsafeKeys(value)
+          ) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      if (!isPlainObject(preferences) || hasUnsafeKeys(preferences)) {
         throw new ApiError("Valid preferences object is required", 400);
       }
 
