@@ -95,7 +95,12 @@ export async function verifyEmail(token) {
  */
 export async function resendVerificationEmail(email) {
   try {
-    const user = await User.findOne({ email });
+    if (typeof email !== "string" || email.trim() === "") {
+      throw new ApiError("Email is required", 400);
+    }
+
+    const normalizedEmail = email.trim();
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       throw new ApiError("User not found", 404);
@@ -137,13 +142,13 @@ export async function resendVerificationEmailHandler(req, res, next) {
   try {
     const email = req.user?.email || req.body?.email;
 
-    if (!email) {
+    if (typeof email !== "string" || email.trim() === "") {
       return res
         .status(400)
         .json({ success: false, message: "Email is required" });
     }
 
-    await resendVerificationEmail(email);
+    await resendVerificationEmail(email.trim());
 
     res.status(200).json({
       success: true,
