@@ -156,10 +156,9 @@ export async function getGoogleBookById(volumeId) {
         }
         if (response.status === 403) {
           const errorText = await response.text().catch(() => '');
-          logger.error("Google Books API 403 Forbidden", { 
+          logger.error("Google Books API 403 Forbidden", {
             error: errorText,
-            hasApiKey: !!apiKey,
-            apiKeyLength: apiKey ? apiKey.length : 0
+            reason: "access_denied"
           });
           throw new ApiError(
             "Google Books API access denied. Please check API key configuration and restrictions.",
