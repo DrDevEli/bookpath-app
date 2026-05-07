@@ -62,10 +62,9 @@ export async function searchGoogleBooks({ title, author, subject, page = 1 }) {
       if (!response.ok) {
         if (response.status === 403) {
           const errorText = await response.text().catch(() => '');
-          logger.error("Google Books API 403 Forbidden", { 
-            error: errorText,
-            hasApiKey: !!apiKey,
-            apiKeyLength: apiKey ? apiKey.length : 0
+          logger.error("Google Books API 403 Forbidden", {
+            hasErrorBody: Boolean(errorText),
+            status: response.status
           });
           throw new ApiError(
             "Google Books API access denied. Please check API key configuration and restrictions.",
