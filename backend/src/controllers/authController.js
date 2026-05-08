@@ -35,12 +35,14 @@ class AuthController {
     try {
       const { email } = req.body;
 
-      if (!email) {
+      if (typeof email !== "string" || !email.trim()) {
         throw new ApiError("Email is required", 400);
       }
 
+      const normalizedEmail = email.trim().toLowerCase();
+
       // Use the password reset controller to handle the request
-      await passwordResetController.requestPasswordReset(email);
+      await passwordResetController.requestPasswordReset(normalizedEmail);
 
       res.status(200).json({
         success: true,
