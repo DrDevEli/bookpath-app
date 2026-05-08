@@ -8,14 +8,15 @@ class CollectionController {
       const { name, description, isPublic, category, color, tags } = req.body;
       const userId = req.user.id;
 
-      if (!name) {
+      if (typeof name !== "string" || !name.trim()) {
         throw new ApiError("Collection name is required", 400);
       }
+      const normalizedName = name.trim();
 
       // Check if collection with same name already exists for this user
       const existingCollection = await BookCollection.findOne({
         user: userId,
-        name,
+        name: { $eq: normalizedName },
       });
       if (existingCollection) {
         throw new ApiError("Collection with this name already exists", 400);
@@ -23,7 +24,7 @@ class CollectionController {
 
       const newCollection = await BookCollection.create({
         user: userId,
-        name,
+        name: normalizedName,
         description,
         isPublic: !!isPublic,
         category: category || "general",
