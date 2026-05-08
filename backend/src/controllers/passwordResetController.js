@@ -83,7 +83,7 @@ export async function resetPassword(token, newPassword) {
   try {
     // Find user with matching token that hasn't expired
     const user = await User.findOne({
-      resetPasswordToken: token,
+      resetPasswordToken: { $eq: token },
       resetPasswordExpires: { $gt: Date.now() },
     });
 
@@ -127,7 +127,7 @@ export async function resetPassword(token, newPassword) {
 export async function validateResetToken(token) {
   try {
     const user = await User.findOne({
-      resetPasswordToken: token,
+      resetPasswordToken: { $eq: token },
       resetPasswordExpires: { $gt: Date.now() },
     });
 

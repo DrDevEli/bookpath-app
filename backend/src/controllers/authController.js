@@ -73,6 +73,10 @@ class AuthController {
         throw new ApiError("Token and new password are required", 400);
       }
 
+      if (typeof token !== "string" || token.trim() === "") {
+        throw new ApiError("Invalid reset token", 400);
+      }
+
       // Use the password reset controller to handle the reset
       await passwordResetController.resetPassword(token, newPassword);
 
