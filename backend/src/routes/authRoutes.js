@@ -337,14 +337,14 @@ router.post(
     try {
       const { email } = req.body;
 
-      if (!email) {
+      if (typeof email !== "string" || email.trim() === "") {
         return res.status(400).json({
           success: false,
           message: "Email is required",
         });
       }
 
-      await emailVerificationController.resendVerificationEmail(email);
+      await emailVerificationController.resendVerificationEmail(email.trim());
 
       res.status(200).json({
         success: true,
