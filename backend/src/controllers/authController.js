@@ -203,6 +203,10 @@ class AuthController {
         throw new ApiError("Verification code and user ID are required", 400);
       }
 
+      if (typeof userId !== "string" || !mongoose.Types.ObjectId.isValid(userId)) {
+        throw new ApiError("Invalid user ID format", 400);
+      }
+
       const user = await User.findById(userId).select("+twoFactorSecret");
       if (!user) {
         throw new ApiError("User not found", 404);
