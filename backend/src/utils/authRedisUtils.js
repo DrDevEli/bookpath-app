@@ -11,18 +11,26 @@ const ACCOUNT_LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
  * Returns the new attempt count.
  */
 export async function incrementLoginAttempts(email) {
+  const normalizedEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : null;
+
+  if (!normalizedEmail) {
+    logger.warn("Invalid login identifier for incrementLoginAttempts", { email });
+    return 0;
+  }
+
   try {
-    const key = `login:${email}:${new Date().toISOString().slice(0, 10)}`;
+    const key = `login:${normalizedEmail}:${new Date().toISOString().slice(0, 10)}`;
     const attempts = await redis.incr(key);
     await redis.expire(key, LOGIN_ATTEMPT_TTL_SECONDS);
 
     // If attempts exceed limit, lock the account
     if (attempts >= LOGIN_ATTEMPT_LIMIT) {
-      const user = await User.findOne({ email });
+      const user = await User.findOne({ email: { $eq: normalizedEmail } });
       if (user) {
         await lockUserAccount(user._id);
         logger.warn("Account locked due to too many failed login attempts", {
-          email,
+          email: normalizedEmail,
         });
       }
     }
@@ -30,7 +38,7 @@ export async function incrementLoginAttempts(email) {
     return attempts;
   } catch (error) {
     logger.error("Error incrementing login attempts", {
-      email,
+      email: normalizedEmail,
       error: error.message,
     });
     return 0; // Return 0 to prevent blocking legitimate login attempts if Redis fails
@@ -41,13 +49,21 @@ export async function incrementLoginAttempts(email) {
  * Clear login attempts for the given email.
  */
 export async function clearLoginAttempts(email) {
+  const normalizedEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : null;
+
+  if (!normalizedEmail) {
+    logger.warn("Invalid login identifier for clearLoginAttempts", { email });
+    return;
+  }
+
   try {
-    const key = `login:${email}:${new Date().toISOString().slice(0, 10)}`;
+    const key = `login:${normalizedEmail}:${new Date().toISOString().slice(0, 10)}`;
     await redis.del(key);
-    logger.info("Login attempts cleared", { email });
+    logger.info("Login attempts cleared", { email: normalizedEmail });
   } catch (error) {
     logger.error("Error clearing login attempts", {
-      email,
+      email: normalizedEmail,
       error: error.message,
     });
   }
