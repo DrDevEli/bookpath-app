@@ -45,13 +45,22 @@ export function Header() {
             Books
           </Link>
           {loggedIn && (
-            <Link
-              to="/collections"
-              className="text-sm font-medium hover:opacity-80 transition-opacity"
-              style={{ color: 'rgb(219, 205, 144)' }}
-            >
-              Dashboard
-            </Link>
+            <>
+              <Link
+                to="/collections"
+                className="text-sm font-medium hover:opacity-80 transition-opacity"
+                style={{ color: 'rgb(219, 205, 144)' }}
+              >
+                Collections
+              </Link>
+              <Link
+                to="/library"
+                className="text-sm font-medium hover:opacity-80 transition-opacity"
+                style={{ color: 'rgb(219, 205, 144)' }}
+              >
+                My Library
+              </Link>
+            </>
           )}
         </nav>
 

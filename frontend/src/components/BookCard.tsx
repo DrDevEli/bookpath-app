@@ -19,7 +19,7 @@ interface Book {
   condition?: 'new' | 'used' | 'unknown';
   category?: string;
   description?: string;
-  readStatus?: 'to-read' | 'reading' | 'completed' | 'abandoned';
+  readStatus?: 'to-read' | 'reading' | 'completed' | 'abandoned' | 'dnf';
   rating?: number;
   notes?: string;
   progress?: number;
@@ -61,6 +61,7 @@ export function BookCard({
       case 'completed': return 'bg-green-100 text-green-800';
       case 'reading': return 'bg-blue-100 text-blue-800';
       case 'abandoned': return 'bg-red-100 text-red-800';
+      case 'dnf': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -70,6 +71,7 @@ export function BookCard({
       case 'completed': return 'Completed';
       case 'reading': return 'Reading';
       case 'abandoned': return 'Abandoned';
+      case 'dnf': return 'DNF';
       default: return 'To Read';
     }
   };

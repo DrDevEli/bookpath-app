@@ -35,3 +35,9 @@ jspm_packages/
 
 # Documentation
 docs/
+
+# Dev scratch/test scripts
+backend/debug_auth.js
+backend/seed_and_test.js
+backend/test_new_features.js
+backend/test_recs.js

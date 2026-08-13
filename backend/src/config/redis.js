@@ -144,43 +144,52 @@ class MockRedis {
 
 let redis;
 
-try {
-  const redisClient = redisConfig.REDIS_URL
-    ? new Redis(redisConfig.REDIS_URL, redisOptions)
-    : new Redis({
-        host: redisConfig.REDIS_HOST,
-        port: redisConfig.REDIS_PORT,
-        password: redisConfig.REDIS_PASSWORD,
-        ...redisOptions,
-      });
+// Force mock Redis if no Redis URL and localhost isn't reachable
+const USE_MOCK = !redisConfig.REDIS_URL && redisConfig.NODE_ENV === "development" && !process.env.REDIS_HOST;
 
-  // Connection event handlers
-  redisClient.on("connect", () => {
-    logger.info("Redis connected");
-  });
-
-  redisClient.on("ready", () => {
-    logger.info("Redis ready");
-  });
-
-  redisClient.on("reconnecting", () => {
-    logger.warn("Redis reconnecting...");
-  });
-
-  redisClient.on("error", (error) => {
-    logger.error("Redis error", { error: error.message });
-  });
-
-  redisClient.on("end", () => {
-    logger.warn("Redis connection closed");
-  });
-
-  redis = redisClient;
-} catch (error) {
-  logger.warn("Redis connection failed, falling back to mock implementation", {
-    error: error.message,
-  });
+if (USE_MOCK) {
   redis = new MockRedis();
+  logger.info("Development mode: using mock Redis (set REDIS_HOST to use real Redis)");
+} else {
+  try {
+    const redisClient = redisConfig.REDIS_URL
+      ? new Redis(redisConfig.REDIS_URL, redisOptions)
+      : new Redis({
+          host: redisConfig.REDIS_HOST,
+          port: redisConfig.REDIS_PORT,
+          password: redisConfig.REDIS_PASSWORD,
+          ...redisOptions,
+          lazyConnect: true,
+        });
+
+    // Connection event handlers
+    redisClient.on("connect", () => {
+      logger.info("Redis connected");
+    });
+
+    redisClient.on("ready", () => {
+      logger.info("Redis ready");
+    });
+
+    redisClient.on("reconnecting", () => {
+      logger.warn("Redis reconnecting...");
+    });
+
+    redisClient.on("error", (error) => {
+      logger.error("Redis error", { error: error.message });
+    });
+
+    redisClient.on("end", () => {
+      logger.warn("Redis connection closed");
+    });
+
+    redis = redisClient;
+  } catch (error) {
+    logger.warn("Redis connection failed, falling back to mock implementation", {
+      error: error.message,
+    });
+    redis = new MockRedis();
+  }
 }
 
 export default redis;

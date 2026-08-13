@@ -37,6 +37,11 @@ const adminRateLimiter = new RateLimiterRedis({
 
 export const rateLimiterMiddleware = async (req, res, next) => {
   try {
+    // Skip rate limiting in development mode (no real Redis)
+    if (process.env.NODE_ENV === 'development') {
+      return next();
+    }
+
     // Determine user role and create a unique key
     const role = req.user?.role || "anon";
     const key = `${role}:${req.user?.id || req.ip}:${req.method}:${req.path}`;

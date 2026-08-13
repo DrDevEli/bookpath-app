@@ -43,6 +43,9 @@ export const authMiddleware = (roles = []) => {
 
       // 2. Check blacklist
       const decoded = jwt.decode(token);
+      if (!decoded || !decoded.jti) {
+        throw new ApiError("Invalid token format", 401);
+      }
       if (await isJwtBlacklisted(decoded.jti)) {
         throw new ApiError("Token revoked", 401);
       }

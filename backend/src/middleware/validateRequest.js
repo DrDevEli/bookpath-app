@@ -105,6 +105,10 @@ const bookSearchSchemas = {
 
 // Generic validation middleware
 export const validateRequest = (schema, property = 'body') => {
+  // If called without a schema (used as bare middleware), skip validation
+  if (!schema || typeof schema.validate !== 'function') {
+    return (req, res, next) => next();
+  }
   return (req, res, next) => {
     const dataToValidate = req[property];
     const { error, value } = schema.validate(dataToValidate, {

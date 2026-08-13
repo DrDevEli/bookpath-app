@@ -136,7 +136,8 @@ export function validateRedisConfig() {
     validatePort("REDIS_PORT");
 
     if (!redisPassword) {
-      throw new ValidationError("Redis password not configured");
+      logger.warn("Redis password not configured — running without Redis auth");
+      return true;
     }
 
     return true;
