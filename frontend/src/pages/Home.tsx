@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import FeaturedBooks from '../components/FeaturedBooks';
+import { recommendationsAPI } from '../api';
+import { isAuthenticated } from '../auth';
 
 const suggestedBooks = [
   {
@@ -51,6 +53,59 @@ export function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentSuggestion, setCurrentSuggestion] = useState(0);
 
+  // AI Recommendations state
+  interface Recommendation {
+    id: string;
+    title: string;
+    author: string;
+    matchScore: number;
+    reason: string;
+    similarTo: string;
+    coverImage?: string;
+  }
+  const [aiRecommendations, setAiRecommendations] = useState<Recommendation[]>([]);
+  const [recsLoading, setRecsLoading] = useState(false);
+  const [recsError, setRecsError] = useState<string | null>(null);
+  const [recsEmpty, setRecsEmpty] = useState(false);
+  const [recsRefreshing, setRecsRefreshing] = useState(false);
+
+  const fetchRecommendations = useCallback(async () => {
+    if (!isAuthenticated()) return;
+    setRecsLoading(true);
+    setRecsError(null);
+    setRecsEmpty(false);
+    try {
+      const res = await recommendationsAPI.getRecommendations();
+      const data = res.data;
+      const recs = Array.isArray(data?.recommendations) ? data.recommendations : Array.isArray(data) ? data : [];
+      if (recs.length === 0) {
+        setRecsEmpty(true);
+      }
+      setAiRecommendations(recs.slice(0, 5));
+    } catch (err: any) {
+      if (err.response?.status === 404 || err.response?.data?.message?.includes('more books')) {
+        setRecsEmpty(true);
+      } else {
+        setRecsError(err.response?.data?.message || err.message || 'Failed to load recommendations');
+      }
+    } finally {
+      setRecsLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = async () => {
+    setRecsRefreshing(true);
+    setRecsError(null);
+    try {
+      await recommendationsAPI.refreshRecommendations();
+      await fetchRecommendations();
+    } catch (err: any) {
+      setRecsError(err.response?.data?.message || err.message || 'Failed to refresh recommendations');
+    } finally {
+      setRecsRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     // Trigger suggestions animation after page loads
     const timer = setTimeout(() => {
@@ -59,6 +114,12 @@ export function Home() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      fetchRecommendations();
+    }
+  }, [fetchRecommendations]);
 
   useEffect(() => {
     if (showSuggestions) {
@@ -216,6 +277,150 @@ export function Home() {
         </h2>
         <FeaturedBooks />
       </section>
+
+      {/* AI Recommendations for You */}
+      {isAuthenticated() && (
+        <section className="mt-12 max-w-5xl mx-auto">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <h2
+              className="text-2xl font-bold tracking-tight text-center"
+              style={{ color: 'rgb(30, 41, 59)', fontFamily: 'Montserrat, sans-serif' }}
+            >
+              AI Recommendations for You
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={recsRefreshing || recsLoading}
+              className="text-xs px-3 py-1 h-7 border-teal-400/50 text-teal-300 hover:bg-teal-400/10 transition-all duration-300"
+            >
+              {recsRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
+
+          {/* Loading state */}
+          {recsLoading && (
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl p-4 animate-pulse"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(74, 0, 127, 0.08) 0%, rgba(0, 230, 230, 0.08) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    minHeight: '200px',
+                  }}
+                >
+                  <div className="h-4 bg-white/10 rounded w-3/4 mb-3"></div>
+                  <div className="h-3 bg-white/10 rounded w-1/2 mb-2"></div>
+                  <div className="h-3 bg-white/10 rounded w-full mb-2"></div>
+                  <div className="h-3 bg-white/10 rounded w-5/6"></div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Error state */}
+          {!recsLoading && recsError && (
+            <div
+              className="text-center p-6 rounded-xl"
+              style={{
+                background: 'linear-gradient(135deg, rgba(74, 0, 127, 0.08) 0%, rgba(0, 230, 230, 0.08) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <p className="text-red-300 text-sm mb-2">{recsError}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchRecommendations}
+                className="text-xs border-red-400/40 text-red-300 hover:bg-red-400/10"
+              >
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!recsLoading && !recsError && recsEmpty && (
+            <div
+              className="text-center p-6 rounded-xl"
+              style={{
+                background: 'linear-gradient(135deg, rgba(74, 0, 127, 0.08) 0%, rgba(0, 230, 230, 0.08) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <p className="text-white/70 text-sm">
+                Add more books to your library to unlock AI-powered recommendations!
+              </p>
+            </div>
+          )}
+
+          {/* Recommendation cards */}
+          {!recsLoading && !recsError && !recsEmpty && aiRecommendations.length > 0 && (
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+              {aiRecommendations.map((rec) => (
+                <div
+                  key={rec.id}
+                  className="rounded-xl p-4 flex flex-col gap-2 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(74, 0, 127, 0.1) 0%, rgba(0, 230, 230, 0.1) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  {/* Match score badge */}
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="inline-block px-2 py-0.5 text-xs font-bold rounded-full"
+                      style={{
+                        backgroundColor: 'rgba(94, 234, 212, 0.2)',
+                        color: 'rgb(94, 234, 212)',
+                        border: '1px solid rgba(94, 234, 212, 0.3)',
+                      }}
+                    >
+                      {Math.round(rec.matchScore)}% Match
+                    </span>
+                  </div>
+
+                  {/* Title */}
+                  <h3
+                    className="font-semibold text-white text-sm line-clamp-2"
+                    style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' }}
+                  >
+                    {rec.title}
+                  </h3>
+
+                  {/* Author */}
+                  <p className="text-xs text-white/70">by {rec.author}</p>
+
+                  {/* Reason */}
+                  {rec.reason && (
+                    <p className="text-xs text-white/60 italic line-clamp-3 leading-relaxed">
+                      &ldquo;{rec.reason}&rdquo;
+                    </p>
+                  )}
+
+                  {/* Similar to */}
+                  {rec.similarTo && (
+                    <div className="mt-auto pt-2 border-t border-white/10">
+                      <p className="text-[10px] text-white/50">
+                        Because you read:{' '}
+                        <span className="text-white/70 font-medium">{rec.similarTo}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Features Section with Logo */}
       <section className="mt-12 space-y-6">

@@ -1,7 +1,7 @@
 import express from "express";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
-import { validateRequest, validateUserLogin } from "../middleware/validateRequest.js";
+import { validateRequest, validateUserRegistration, validateUserLogin } from "../middleware/validateRequest.js";
 import { rateLimiterMiddleware } from "../middleware/rateLimiter.js";
 
 const publicResendLimiter = rateLimit({
@@ -74,7 +74,7 @@ const router = express.Router();
 router.post(
   "/register",
   rateLimiterMiddleware,
-  validateRequest,
+  validateUserRegistration,
   UserController.register
 );
 

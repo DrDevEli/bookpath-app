@@ -126,6 +126,142 @@ class AmazonAffiliateService {
   }
 
   /**
+   * Get estimated book price based on metadata.
+   * Since real-time Amazon scraping is unreliable without API access,
+   * this builds a reasonable price estimate based on book attributes.
+   *
+   * @param {Object} book - Book metadata
+   * @param {string} book.title - Book title
+   * @param {string[]} [book.authors] - Author names
+   * @param {number} [book.pageCount] - Number of pages
+   * @param {string|number} [book.publishedDate] - Publication date (year or ISO string)
+   * @param {string} [book.publisher] - Publisher name
+   * @param {number} [book.averageRating] - Average rating (for bestseller premium)
+   * @param {number} [book.ratingsCount] - Rating count (for bestseller detection)
+   * @returns {Promise<Object>} Price estimate { amount, currency, format, url, confidence }
+   */
+  async getBookPrice(book) {
+    const { title, authors, pageCount, publishedDate, publisher, averageRating, ratingsCount } = book;
+
+    // Generate affiliate link URL
+    const url = await this.generateAffiliateLink({ title, authors: authors || [] });
+
+    // Estimate base price from page count
+    const pages = pageCount || 250; // default 250 pages if unknown
+    const pricePerPage = 0.08 + Math.random() * 0.07; // 0.08-0.15 EUR per page
+    let basePrice = pages * pricePerPage;
+
+    // Apply age discount for books older than 1 year
+    if (publishedDate) {
+      const pubYear = typeof publishedDate === 'number'
+        ? publishedDate
+        : parseInt(String(publishedDate).match(/^(\d{4})/)?.[1] || publishedDate);
+      const currentYear = new Date().getFullYear();
+      const age = currentYear - pubYear;
+      if (age > 1) {
+        const discountFactor = 0.70 - Math.min(age * 0.02, 0.30); // 30-70% discount, max 50% reduction
+        basePrice *= Math.max(discountFactor, 0.50);
+      }
+    }
+
+    // Bestseller premium: high ratings + many reviews
+    const isBestseller = averageRating >= 4.0 && ratingsCount >= 100;
+    if (isBestseller) {
+      basePrice *= 1.15; // 15% premium
+    }
+
+    // Build format options with different multipliers
+    const formats = {
+      paperback: {
+        amount: Math.round(basePrice * 1.0 * 100) / 100,
+        currency: 'EUR',
+        format: 'paperback',
+        url,
+        confidence: 'estimated',
+      },
+      hardcover: {
+        amount: Math.round(basePrice * 1.6 * 100) / 100,
+        currency: 'EUR',
+        format: 'hardcover',
+        url,
+        confidence: 'estimated',
+      },
+      kindle: {
+        amount: Math.round(basePrice * 0.65 * 100) / 100,
+        currency: 'EUR',
+        format: 'kindle',
+        url,
+        confidence: 'estimated',
+      },
+    };
+
+    return formats;
+  }
+
+  /**
+   * Get a single price estimate (defaulting to paperback) for a book.
+   * Convenience method for simple use cases.
+   *
+   * @param {Object} book - Book metadata
+   * @returns {Promise<Object>} Single price estimate
+   */
+  async getBookPriceSingle(book) {
+    const formats = await this.getBookPrice(book);
+    return formats.paperback;
+  }
+
+  /**
+   * Enrich an array of books with Amazon price estimates.
+   * Adds both amazonLink and price fields to each book.
+   *
+   * @param {Array} books - Array of book objects
+   * @returns {Promise<Array>} Books enriched with amazonLink and price
+   */
+  async enrichBooksWithPrices(books) {
+    if (!Array.isArray(books) || books.length === 0) {
+      return books;
+    }
+
+    try {
+      const enriched = await Promise.all(
+        books.map(async (book) => {
+          // Skip if fully enriched already
+          if (book.price && book.amazonLink) {
+            return book;
+          }
+
+          const priceFormats = await this.getBookPrice(book);
+          const amazonLink = priceFormats.paperback.url;
+
+          return {
+            ...book,
+            amazonLink,
+            price: priceFormats,
+          };
+        })
+      );
+
+      logger.debug("Enriched books with Amazon price estimates", {
+        bookCount: enriched.length,
+        enrichedCount: enriched.filter((b) => b.price).length,
+      });
+
+      return enriched;
+    } catch (error) {
+      logger.error("Error enriching books with prices", {
+        error: error.message,
+        bookCount: books.length,
+      });
+
+      return books.map((book) => ({
+        ...book,
+        amazonLink: null,
+        price: null,
+      }));
+    }
+  }
+
+  /**
    * Check if Amazon Associates is configured
    * @returns {boolean} True if associate tag is configured
    */

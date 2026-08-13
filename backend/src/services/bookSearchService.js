@@ -100,8 +100,8 @@ export default class BookSearchService {
       const remainingBooks = page === 1 ? sortedBooks.slice(20) : sortedBooks;
       const allEnrichedBooks = page === 1 ? [...enrichedBooks, ...remainingBooks] : sortedBooks;
 
-      // Add Amazon affiliate links
-      const booksWithAffiliateLinks = await this.addAffiliateLinks(allEnrichedBooks);
+      // Add Amazon affiliate links and price estimates
+      const booksWithAffiliateLinks = await this.addAffiliateLinksAndPrices(allEnrichedBooks);
 
       // Calculate pagination
       const totalResults = sortedBooks.length;
@@ -289,20 +289,21 @@ export default class BookSearchService {
   }
 
   /**
-   * Add Amazon affiliate links to books
+   * Add Amazon affiliate links and price estimates to books
    */
-  async addAffiliateLinks(books) {
+  async addAffiliateLinksAndPrices(books) {
     try {
-      return await amazonAffiliateService.addAffiliateLinksToBooks(books);
+      return await amazonAffiliateService.enrichBooksWithPrices(books);
     } catch (error) {
-      logger.error("Error adding affiliate links", {
+      logger.error("Error adding affiliate links and prices", {
         error: error.message
       });
       
-      // Return books without affiliate links if there's an error
+      // Return books without affiliate links/prices if there's an error
       return books.map(book => ({
         ...book,
-        amazonLink: null
+        amazonLink: null,
+        price: null
       }));
     }
   }

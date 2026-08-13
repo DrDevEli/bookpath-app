@@ -15,6 +15,7 @@ import { Collections } from './pages/Collections';
 import { CollectionDetail } from './pages/CollectionDetail';
 import Category from './pages/Category';
 import { BookSearch } from './components/BookSearch';
+import { Library } from './pages/Library';
 
 // Styles
 import './App.css';
@@ -46,6 +47,7 @@ function App() {
             <Route path="/books/:id" element={<BookDetails />} />
             <Route path="/collections" element={<Collections />} />
             <Route path="/collections/:id" element={<CollectionDetail />} />
+            <Route path="/library" element={<Library />} />
             <Route path="/category" element={<Category />} />
             <Route path="/category/:category" element={<Category />} />
           </Routes>

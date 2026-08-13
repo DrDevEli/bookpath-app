@@ -423,10 +423,32 @@ class BookController {
     try {
       const { id } = req.params;
       
-      // Get book details
-      let book = await Book.findById(id);
+      // Get book details (guard against non-ObjectId IDs like 'google-*' which
+      // throw a Mongoose CastError instead of returning null)
+      let book = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        book = await Book.findById(id);
+      }
       if (!book) {
         book = await Book.findOne({ externalId: id });
+      }
+
+      // If still not found and it's a Google Books ID, fetch minimal metadata
+      // so the affiliate search URL is accurate even on a direct click.
+      if (!book && id.startsWith("google-")) {
+        try {
+          const volumeId = id.replace(/^google-/, "");
+          const googleBook = await getGoogleBookById(volumeId);
+          book = {
+            title: googleBook.title,
+            authors: googleBook.authors || googleBook.authorNames || [],
+          };
+        } catch (googleError) {
+          logger.warn("Affiliate click: Google Books lookup failed", {
+            bookId: id,
+            error: googleError.message,
+          });
+        }
       }
       
       // COMMENTED OUT FOR TESTING - Open Library fallback disabled

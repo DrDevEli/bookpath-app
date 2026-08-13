@@ -1,6 +1,6 @@
+import "dotenv/config"; // MUST be first — loads .env before any module reads process.env
 import express from "express";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import cors from "cors";
 import compression from "compression";
 import passport from "./src/config/passport.js";
@@ -9,6 +9,8 @@ import authRoutes from "./src/routes/authRoutes.js";
 import bookRoutes from "./src/routes/bookRoutes.js";
 import collectionRoutes from "./src/routes/collectionRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
+import recommendationRoutes from "./src/routes/recommendationRoutes.js";
+import libraryRoutes from "./src/routes/libraryRoutes.js";
 import logger from "./src/config/logger.js";
 import securityMiddleware from "./src/middleware/security.js";
 import {
@@ -18,9 +20,6 @@ import {
 } from "./src/utils/envValidator.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
-
-// Load environment variables
-dotenv.config();
 
 // Validate Redis configuration
 validateRedisConfig();
@@ -174,6 +173,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/books", bookRoutes);
 app.use("/api/collections", collectionRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/library", libraryRoutes);
+app.use("/api/recommendations", recommendationRoutes);
 
 // Add Swagger documentation
 app.use(
