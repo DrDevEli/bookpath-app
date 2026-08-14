@@ -79,7 +79,7 @@ async function sendEmail({ to, subject, html, text }) {
 
     const mailOptions = {
       from: `"BookPath API" <${
-        emailConfig.SMTP_USER || "noreply@bookpath.online"
+        emailConfig.SMTP_USER || "noreply@bookpath.org"
       }>`,
       to,
       subject,

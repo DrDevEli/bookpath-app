@@ -57,7 +57,7 @@ export async function searchGoogleBooks({ title, author, subject, q, page = 1 })
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "BookPath/1.0 (https://bookpath.online)",
+          "User-Agent": "BookPath/1.0 (https://bookpath.org)",
         },
       });
 
@@ -147,7 +147,7 @@ export async function getGoogleBookById(volumeId) {
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "BookPath/1.0 (https://bookpath.online)",
+          "User-Agent": "BookPath/1.0 (https://bookpath.org)",
         },
       });
 
