@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import api from '../api';
 import { isAuthenticated } from '../auth';
+import { EmailDeals } from '../components/EmailDeals';
 
 interface Book {
   id: string;
@@ -47,6 +48,24 @@ const addToCollectionSchema = z.object({
 });
 
 type AddToCollectionForm = z.infer<typeof addToCollectionSchema>;
+
+// Phase 3: A/B CTA variant. Deterministic per browser (persisted in
+// localStorage) so a visitor always sees the same variant; the chosen variant is
+// sent with the affiliate click and compared via /analytics/clicks-by-variant.
+const CTA_VARIANTS = ['buy', 'price', 'get'] as const;
+const CTA_TEXT: Record<string, string> = {
+  buy: 'Buy on Amazon',
+  price: 'Check Price on Amazon',
+  get: 'Get it on Amazon',
+};
+function getCtaVariant(): string {
+  let v = localStorage.getItem('bp_cta_variant');
+  if (!v) {
+    v = CTA_VARIANTS[Math.floor(Math.random() * CTA_VARIANTS.length)];
+    localStorage.setItem('bp_cta_variant', v);
+  }
+  return v;
+}
 
 export function BookDetails() {
   const { id } = useParams<{ id: string }>();
@@ -202,6 +221,7 @@ export function BookDetails() {
       const context = searchParams.get('context');
       if (source) params.source = source;
       if (context) params.context = context;
+      params.variant = getCtaVariant(); // A/B attribution
       const response = await api.get(`/books/${book.id}/affiliate-click`, { params });
       
       if (response.data.success && response.data.data?.affiliateUrl) {
@@ -346,9 +366,20 @@ export function BookDetails() {
                   </div>
                 )}
 
+                {/* Price (real Google Books list price when available) */}
+                {book.price != null && (
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-3xl font-bold text-green-700">
+                      {book.currencyCode === 'EUR' ? '€' : book.currencyCode === 'USD' ? '$' : book.currencyCode ? `${book.currencyCode} ` : ''}
+                      {book.price.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">list price</span>
+                  </div>
+                )}
+
                 {/* Buy Button */}
                 {(book.buyLink || book.amazonLink) && (
-                  <div className="mt-6">
+                  <div className="mt-4">
                     <Button
                       onClick={handleBuyClick}
                       disabled={loadingAffiliate}
@@ -362,7 +393,7 @@ export function BookDetails() {
                       ) : (
                         <div className="flex items-center gap-2">
                           <span>🛒</span>
-                          <span>{book.buyLink ? 'Purchase Book' : 'Buy on Amazon'}</span>
+                          <span>{book.buyLink ? 'Purchase Book' : CTA_TEXT[getCtaVariant()]}</span>
                         </div>
                       )}
                     </Button>
@@ -373,6 +404,9 @@ export function BookDetails() {
                     )}
                   </div>
                 )}
+
+                {/* Email capture — non-blocking, next to the buy CTA */}
+                <EmailDeals source="book-details" context={book.title} />
               </div>
             </CardContent>
           </Card>

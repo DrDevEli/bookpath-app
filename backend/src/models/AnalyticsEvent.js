@@ -47,6 +47,10 @@ const analyticsEventSchema = new mongoose.Schema(
     coverImage: { type: String, trim: true },
     amazonUrl: { type: String, trim: true },
 
+    // A/B test variant of the CTA that produced this click (e.g. "buy", "price").
+    // Lets the dashboard compare click-through by CTA copy.
+    variant: { type: String, trim: true },
+
     // Impression-only field: how many books were shown
     resultCount: { type: Number, min: 0 },
 

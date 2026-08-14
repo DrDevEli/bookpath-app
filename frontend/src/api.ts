@@ -55,6 +55,12 @@ export const recommendationsAPI = {
   refreshRecommendations: () => api.post('/recommendations/refresh'),
 };
 
+// Email capture (Phase 3 — builds the reactivation list; delivery gated on SMTP)
+export const subscribersAPI = {
+  subscribe: (email: string, source?: string, context?: string) =>
+    api.post('/subscribers', { email, source, context }),
+};
+
 // Analytics (affiliate funnel KPIs)
 export const analyticsAPI = {
   getTrending: (limit = 8) => api.get('/analytics/trending', { params: { limit } }),

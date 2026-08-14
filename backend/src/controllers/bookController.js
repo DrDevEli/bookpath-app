@@ -502,7 +502,7 @@ class BookController {
       // Persist the click for analytics (fire-and-forget, never blocks the redirect).
       // `source`/`context` are threaded from the frontend so CTR can be computed
       // per search query and per category.
-      const { source = "book-details", context } = req.query;
+      const { source = "book-details", context, variant } = req.query;
       analyticsService.recordClick({
         source,
         context: context || null,
@@ -511,6 +511,7 @@ class BookController {
         authors: book.authors || [],
         coverImage: book.coverImage || null,
         amazonUrl: amazonLink,
+        variant: variant || null,
         userId: req.user?.id || null,
         req,
       });

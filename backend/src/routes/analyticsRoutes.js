@@ -12,5 +12,6 @@ router.get("/overview", authMiddleware(["admin"]), AnalyticsController.overview)
 router.get("/top-books", authMiddleware(["admin"]), AnalyticsController.topBooks);
 router.get("/top-queries", authMiddleware(["admin"]), AnalyticsController.topQueries);
 router.get("/daily", authMiddleware(["admin"]), AnalyticsController.daily);
+router.get("/clicks-by-variant", authMiddleware(["admin"]), AnalyticsController.clicksByVariant);
 
 export default router;

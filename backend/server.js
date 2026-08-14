@@ -13,6 +13,7 @@ import recommendationRoutes from "./src/routes/recommendationRoutes.js";
 import libraryRoutes from "./src/routes/libraryRoutes.js";
 import analyticsRoutes from "./src/routes/analyticsRoutes.js";
 import seoRoutes from "./src/routes/seoRoutes.js";
+import subscriberRoutes from "./src/routes/subscriberRoutes.js";
 import logger from "./src/config/logger.js";
 import securityMiddleware from "./src/middleware/security.js";
 import {
@@ -178,6 +179,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/library", libraryRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/subscribers", subscriberRoutes);
 
 // SEO landing pages (server-rendered HTML at crawlable root paths)
 app.use("/", seoRoutes);
