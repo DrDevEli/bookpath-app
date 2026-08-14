@@ -72,6 +72,9 @@ validateEnv([
 // Initialize Express app
 const app = express();
 const PORT = config.PORT;
+// Bind to loopback only — nginx is the only public entrypoint. The backend
+// must never listen on a public interface (defense in depth; ufw also blocks it).
+const HOST = process.env.HOST || "127.0.0.1";
 
 // Apply security middleware (includes helmet)
 securityMiddleware(app);
@@ -252,7 +255,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Start server regardless of MongoDB connection status
 const startServer = async () => {
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, HOST, () => {
     logger.info(`Server running in ${config.NODE_ENV} mode on port ${PORT}`);
     logger.info(
       `API documentation available at http://localhost:${PORT}/api-docs`
