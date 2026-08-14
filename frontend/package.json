@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "BookPath Frontend - AI-enhanced book discovery platform",
   "private": true,
-  "homepage": "https://www.bookpath.eu",
+  "homepage": "https://bookpath.online",
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-dialog": "^1.1.14",

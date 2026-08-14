@@ -12,7 +12,7 @@ echo ""
 # Check if domain is provided
 if [ -z "$1" ]; then
     echo "❌ Error: Please provide your domain name"
-    echo "Usage: ./scripts/setup-production.sh bookpath.eu"
+    echo "Usage: ./scripts/setup-production.sh bookpath.online"
     exit 1
 fi
 
