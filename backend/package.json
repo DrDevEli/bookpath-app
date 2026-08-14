@@ -11,7 +11,10 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "refresh:seo": "node scripts/refreshSeoCache.js",
+    "report:kpi": "node scripts/kpiReport.js",
+    "health": "node scripts/healthCheck.js"
   },
   "keywords": [
     "bookpath",
