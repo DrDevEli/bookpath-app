@@ -41,6 +41,7 @@ class AnalyticsService {
     authors = [],
     coverImage,
     amazonUrl,
+    variant = null,
     userId = null,
     req = null,
   }) {
@@ -54,6 +55,7 @@ class AnalyticsService {
       authors,
       coverImage: coverImage || null,
       amazonUrl: amazonUrl || null,
+      variant: variant || null,
       userId: userId || undefined,
       ipAddress: req?.ip,
       userAgent: req?.headers?.["user-agent"],
@@ -190,6 +192,18 @@ class AnalyticsService {
         },
       },
       { $sort: { _id: 1 } },
+    ]);
+  }
+
+  /**
+   * Click counts grouped by CTA variant (A/B test comparison) within a window.
+   */
+  async getClicksByVariant({ days = 30 } = {}) {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    return AnalyticsEvent.aggregate([
+      { $match: { type: "click", timestamp: { $gte: cutoff } } },
+      { $group: { _id: { $ifNull: ["$variant", "unset"] }, clicks: { $sum: 1 } } },
+      { $sort: { clicks: -1 } },
     ]);
   }
 

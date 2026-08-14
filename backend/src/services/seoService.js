@@ -66,6 +66,13 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
+function currencySymbol(code) {
+  if (code === "USD") return "$";
+  if (code === "EUR") return "€";
+  if (code === "GBP") return "£";
+  return code ? `${code} ` : "";
+}
+
 // ---------------------------------------------------------------------------
 // Unique intro/outro copy (EN + DE) — templated + rotated by slug hash to avoid
 // thin/duplicate content across the catalog.
@@ -251,8 +258,14 @@ function bookCardHtml(book) {
   const year = book.firstPublishYear ? escapeHtml(book.firstPublishYear) : "";
 
   const link = book.amazonLink
-    ? `<a class="amz" href="${escapeHtml(book.amazonLink)}" rel="nofollow sponsored noopener noreferrer" target="_blank">View on Amazon →</a>`
+    ? `<a class="amz" href="${escapeHtml(book.amazonLink)}" rel="nofollow sponsored noopener noreferrer" target="_blank">Check price on Amazon →</a>`
     : `<a class="detail" href="${bookDetailUrl(book.id)}">View details</a>`;
+
+  // Real list price from Google Books saleInfo (present only for some books).
+  const price =
+    book.price != null
+      ? `<p class="bprice">${currencySymbol(book.currencyCode)}${Number(book.price).toFixed(2)} <span>list price</span></p>`
+      : "";
 
   return `
       <article class="book">
@@ -262,6 +275,7 @@ function bookCardHtml(book) {
           ${authors ? `<p class="bauthor">by ${authors}</p>` : ""}
           ${year ? `<p class="byear">${year}</p>` : ""}
           ${desc ? `<p class="bdesc">${desc}…</p>` : ""}
+          ${price}
           ${link}
         </div>
       </article>`;
@@ -346,6 +360,8 @@ export function renderLandingPage({ type, entry, books = [] }) {
     .btitle a:hover { color:var(--brand); }
     .bauthor, .byear { margin:0 0 4px; color:var(--muted); font-size:.88rem; }
     .bdesc { margin:0 0 10px; font-size:.86rem; color:#475569; }
+    .bprice { margin:0 0 8px; font-size:.95rem; font-weight:700; color:#15803d; }
+    .bprice span { font-weight:400; font-size:.78rem; color:var(--muted); }
     a.amz, a.detail { display:inline-block; font-weight:600; text-decoration:none; }
     a.amz { color:#b45309; }
     a.detail { color:var(--brand); }

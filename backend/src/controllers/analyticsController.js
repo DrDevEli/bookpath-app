@@ -50,6 +50,16 @@ class AnalyticsController {
     }
   }
 
+  static async clicksByVariant(req, res, next) {
+    try {
+      const days = Math.min(Math.max(parseInt(req.query.days) || 30, 1), 365);
+      const byVariant = await analyticsService.getClicksByVariant({ days });
+      res.json({ success: true, data: byVariant });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async trending(req, res, next) {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit) || 8, 1), 50);
