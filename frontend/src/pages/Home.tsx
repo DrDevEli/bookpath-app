@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import FeaturedBooks from '../components/FeaturedBooks';
+import TrendingBooks from '../components/TrendingBooks';
 import { recommendationsAPI } from '../api';
 import { isAuthenticated } from '../auth';
 
@@ -276,6 +277,19 @@ export function Home() {
           Featured Books
         </h2>
         <FeaturedBooks />
+      </section>
+
+      {/* Trending Now — top-converting section (renders only when click data exists) */}
+      <section className="mt-12 max-w-7xl mx-auto">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <h2 className="text-2xl font-bold tracking-tight text-center" style={{ color: 'rgb(30, 41, 59)', fontFamily: 'Montserrat, sans-serif' }}>
+            Trending Now
+          </h2>
+          <span className="inline-block px-2 py-0.5 text-xs font-bold rounded-full" style={{ backgroundColor: 'rgba(219, 205, 144, 0.2)', color: 'rgb(120, 90, 20)', border: '1px solid rgba(219, 205, 144, 0.5)' }}>
+            Most Clicked
+          </span>
+        </div>
+        <TrendingBooks />
       </section>
 
       {/* AI Recommendations for You */}

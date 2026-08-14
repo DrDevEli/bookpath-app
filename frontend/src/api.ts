@@ -55,6 +55,15 @@ export const recommendationsAPI = {
   refreshRecommendations: () => api.post('/recommendations/refresh'),
 };
 
+// Analytics (affiliate funnel KPIs)
+export const analyticsAPI = {
+  getTrending: (limit = 8) => api.get('/analytics/trending', { params: { limit } }),
+  getOverview: () => api.get('/analytics/overview'),
+  getTopBooks: (days = 30, limit = 10) => api.get('/analytics/top-books', { params: { days, limit } }),
+  getTopQueries: (days = 30, limit = 10) => api.get('/analytics/top-queries', { params: { days, limit } }),
+  getDaily: (days = 14) => api.get('/analytics/daily', { params: { days } }),
+};
+
 // Price helper - returns the best display price from API response
 export const getDisplayPrice = (price: any) => {
   if (!price) return null;

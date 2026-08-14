@@ -16,6 +16,7 @@ import { CollectionDetail } from './pages/CollectionDetail';
 import Category from './pages/Category';
 import { BookSearch } from './components/BookSearch';
 import { Library } from './pages/Library';
+import { Analytics } from './pages/Analytics';
 
 // Styles
 import './App.css';
@@ -50,6 +51,7 @@ function App() {
             <Route path="/library" element={<Library />} />
             <Route path="/category" element={<Category />} />
             <Route path="/category/:category" element={<Category />} />
+            <Route path="/analytics" element={<Analytics />} />
           </Routes>
           </main>
           <Footer />

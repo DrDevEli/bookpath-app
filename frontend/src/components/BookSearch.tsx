@@ -379,6 +379,8 @@ export function BookSearch() {
                   onAddToCollection={setShowAddToCollection}
                   showAddButton={isLoggedIn}
                   isLoggedIn={isLoggedIn}
+                  source="search"
+                  context={lastSearchTitle || lastSearchAuthor || category || undefined}
                 />
               ))}
             </div>

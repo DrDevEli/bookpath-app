@@ -11,6 +11,7 @@ import collectionRoutes from "./src/routes/collectionRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import recommendationRoutes from "./src/routes/recommendationRoutes.js";
 import libraryRoutes from "./src/routes/libraryRoutes.js";
+import analyticsRoutes from "./src/routes/analyticsRoutes.js";
 import logger from "./src/config/logger.js";
 import securityMiddleware from "./src/middleware/security.js";
 import {
@@ -175,6 +176,7 @@ app.use("/api/collections", collectionRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/library", libraryRoutes);
 app.use("/api/recommendations", recommendationRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // Add Swagger documentation
 app.use(

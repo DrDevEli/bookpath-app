@@ -37,6 +37,10 @@ interface BookCardProps {
   showProgress?: boolean;
   onEdit?: (bookId: string) => void;
   onRemove?: (bookId: string) => void;
+  // Attribution context threaded into the detail URL so affiliate clicks
+  // can be traced back to the surface + query that produced them.
+  source?: string;
+  context?: string;
 }
 
 export function BookCard({ 
@@ -49,7 +53,9 @@ export function BookCard({
   showReadStatus = false,
   showProgress = false,
   onEdit,
-  onRemove
+  onRemove,
+  source,
+  context
 }: BookCardProps) {
   const getRatingStars = (rating?: number) => {
     if (!rating) return 'No rating';
@@ -75,6 +81,15 @@ export function BookCard({
       default: return 'To Read';
     }
   };
+
+  const detailPath = (() => {
+    const id = book.openLibraryKey ? book.openLibraryKey.replace('/works/', '') : (book.id || book.bookId || '');
+    const params = new URLSearchParams();
+    if (source) params.append('source', source);
+    if (context) params.append('context', context);
+    const qs = params.toString();
+    return qs ? `/books/${id}?${qs}` : `/books/${id}`;
+  })();
 
   return (
     <div
@@ -206,7 +221,7 @@ export function BookCard({
             asChild 
             className="transition-all duration-300 hover:scale-105 text-xs px-2 py-1 h-8 min-h-0 w-full border-primary text-primary font-semibold"
           >
-            <Link to={`/books/${book.openLibraryKey ? book.openLibraryKey.replace('/works/', '') : (book.id || book.bookId || '')}`}>View</Link>
+            <Link to={detailPath}>View</Link>
           </Button>
           
           {showAddButton && isLoggedIn && onAddToCollection && (

@@ -4,6 +4,7 @@ import advancedSearchService from "../services/advancedSearchService.js";
 import { getGoogleBookById } from "../services/googleBooksService.js";
 import amazonAffiliateService from "../services/amazonAffiliateService.js";
 import featuredBooksService from "../services/featuredBooksService.js";
+import analyticsService from "../services/analyticsService.js";
 import { ApiError } from "../utils/errors.js";
 import redis from "../config/redis.js";
 import logger from "../config/logger.js";
@@ -20,9 +21,16 @@ class BookController {
       }
 
       const cacheKey = `search:${title || ''}:${author || ''}:${category || ''}:${condition || ''}:${sort || ''}:${page}`;
+      const context = title || author || category || null;
       const cached = await redis.get(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached);
+        analyticsService.recordImpression({
+          source: "search",
+          context,
+          resultCount: parsed?.pagination?.totalResults || parsed?.data?.length || 0,
+          req,
+        });
         return res.json({ success: true, ...parsed });
       }
 
@@ -35,6 +43,12 @@ class BookController {
         sort: sort || undefined,
       });
       await redis.set(cacheKey, JSON.stringify(result), "EX", 3600); // cache 1 hour
+      analyticsService.recordImpression({
+        source: "search",
+        context,
+        resultCount: result?.pagination?.totalResults || result?.data?.length || 0,
+        req,
+      });
       res.json({ success: true, ...result });
     } catch (error) {
       next(error);
@@ -386,6 +400,12 @@ class BookController {
       });
 
       await redis.set(cacheKey, JSON.stringify(result), "EX", 3600); // cache 1 hour
+      analyticsService.recordImpression({
+        source: "category",
+        context: category,
+        resultCount: result?.pagination?.totalResults || result?.data?.length || 0,
+        req,
+      });
       res.json({ success: true, ...result });
     } catch (error) {
       next(error);
@@ -474,18 +494,35 @@ class BookController {
         title: book.title,
         authors: book.authors || []
       });
-      
-      // Log the click (optional: store in database for analytics)
-      logger.info("Affiliate link clicked", {
-        bookId: id,
-        bookTitle: book.title,
-        timestamp: new Date().toISOString()
-      });
-      
+
       if (!amazonLink) {
         throw new ApiError("Affiliate link not available", 500);
       }
-      
+
+      // Persist the click for analytics (fire-and-forget, never blocks the redirect).
+      // `source`/`context` are threaded from the frontend so CTR can be computed
+      // per search query and per category.
+      const { source = "book-details", context } = req.query;
+      analyticsService.recordClick({
+        source,
+        context: context || null,
+        bookId: id,
+        bookTitle: book.title,
+        authors: book.authors || [],
+        coverImage: book.coverImage || null,
+        amazonUrl: amazonLink,
+        userId: req.user?.id || null,
+        req,
+      });
+
+      logger.info("Affiliate link clicked", {
+        bookId: id,
+        bookTitle: book.title,
+        source,
+        context: context || null,
+        timestamp: new Date().toISOString()
+      });
+
       res.status(200).json({
         success: true,
         data: {
