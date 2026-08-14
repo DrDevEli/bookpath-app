@@ -1,14 +1,14 @@
 # BookPath production infrastructure — MongoDB + Redis.
 #
-# SECURITY: bind to 127.0.0.1 ONLY. Never expose a database port publicly —
-# an internet-facing MongoDB with no auth is the #1 target for automated
-# ransomware/wipe attacks. The backend reaches both over localhost.
+# SECURITY: the `127.0.0.1:` port bindings below expose these ONLY on the host's
+# loopback (never publicly). Do NOT add `--bind_ip`/`--bind 127.0.0.1` inside the
+# container — that binds to the *container's* loopback, which Docker's
+# port-forward (targeting the container's eth0) cannot reach.
 services:
   mongo:
     image: mongo:7
     container_name: bookpath-mongo
     restart: unless-stopped
-    command: ["mongod", "--bind_ip", "127.0.0.1"]
     ports:
       - "127.0.0.1:27017:27017"
     volumes:
@@ -18,7 +18,7 @@ services:
     image: redis:7-alpine
     container_name: bookpath-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--bind", "127.0.0.1"]
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
