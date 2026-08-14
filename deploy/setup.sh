@@ -4,7 +4,7 @@
 # (Hetzner / Hostinger KVM / DigitalOcean / any Ubuntu 22.04 or 24.04 box).
 #
 # Usage (as root, on a fresh VPS):
-#   ./deploy/setup.sh bookpath.online
+#   ./deploy/setup.sh bookpath.org
 #
 # What it does, in order:
 #   1. Installs nginx, docker, certbot, Node 20 (via NodeSource)
@@ -23,7 +23,7 @@ REPO_URL="${REPO_URL:-https://github.com/DrDevEli/bookpath-app.git}"
 APP_DIR="/opt/bookpath"
 
 if [ -z "$DOMAIN" ]; then
-  echo "Usage: $0 <domain>   e.g. $0 bookpath.online"
+  echo "Usage: $0 <domain>   e.g. $0 bookpath.org"
   exit 1
 fi
 
