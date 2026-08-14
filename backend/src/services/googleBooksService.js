@@ -12,15 +12,19 @@ const GOOGLE_BOOKS_API_BASE_URL = "https://www.googleapis.com/books/v1";
  * @param {number} [params.page=1] - Page number
  * @returns {Promise<Array>} Array of book objects
  */
-export async function searchGoogleBooks({ title, author, subject, page = 1 }) {
+export async function searchGoogleBooks({ title, author, subject, q, page = 1 }) {
   try {
-    if (!title && !author && !subject) {
-      throw new ApiError("At least one of title, author, or subject is required", 400);
+    if (!title && !author && !subject && !q) {
+      throw new ApiError("At least one of title, author, subject, or q is required", 400);
     }
 
     // Build search query
     let query = "";
-    if (subject) {
+    if (q) {
+      // General full-text query (used by SEO landing pages for long-tail
+      // keywords like "best science fiction books")
+      query = encodeURIComponent(q);
+    } else if (subject) {
       // Subject search - Google Books uses "subject:" prefix
       query = `subject:${encodeURIComponent(subject)}`;
     } else if (title && author) {
