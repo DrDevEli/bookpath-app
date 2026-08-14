@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { isAuthenticated, logout } from '../../auth';
+import { isAuthenticated, logout, getUserRole } from '../../auth';
 
 export function Header() {
   const navigate = useNavigate();
   const loggedIn = isAuthenticated();
+  const role = getUserRole();
 
   const handleLogout = () => {
     logout();
@@ -60,6 +61,15 @@ export function Header() {
               >
                 My Library
               </Link>
+              {role === 'admin' && (
+                <Link
+                  to="/analytics"
+                  className="text-sm font-medium hover:opacity-80 transition-opacity"
+                  style={{ color: 'rgb(219, 205, 144)' }}
+                >
+                  Analytics
+                </Link>
+              )}
             </>
           )}
         </nav>

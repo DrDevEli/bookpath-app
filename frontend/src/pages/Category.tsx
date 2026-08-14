@@ -189,6 +189,8 @@ export default function Category() {
                     key={book.id || book.openLibraryKey || book.title}
                     book={book}
                     isLoggedIn={isLoggedIn}
+                    source="category"
+                    context={selectedCategory}
                   />
                 ))}
               </div>

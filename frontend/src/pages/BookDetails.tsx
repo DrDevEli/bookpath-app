@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -50,6 +50,7 @@ type AddToCollectionForm = z.infer<typeof addToCollectionSchema>;
 
 export function BookDetails() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [book, setBook] = useState<Book | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,8 +195,14 @@ export function BookDetails() {
     
     try {
       setLoadingAffiliate(true);
-      // Track click and get affiliate URL
-      const response = await api.get(`/books/${book.id}/affiliate-click`);
+      // Track click and get affiliate URL, threading the attribution context
+      // (source + query/category) so analytics can compute CTR per surface.
+      const params: Record<string, string> = {};
+      const source = searchParams.get('source');
+      const context = searchParams.get('context');
+      if (source) params.source = source;
+      if (context) params.context = context;
+      const response = await api.get(`/books/${book.id}/affiliate-click`, { params });
       
       if (response.data.success && response.data.data?.affiliateUrl) {
         // Open affiliate link in new tab

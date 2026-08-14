@@ -38,4 +38,15 @@ export const isAuthenticated = () => {
 
 export const getToken = () => {
   return localStorage.getItem(TOKEN_KEY);
+};
+
+export const getUserRole = (): string | null => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.role || null;
+  } catch {
+    return null;
+  }
 }; 
