@@ -8,7 +8,7 @@ const doc = {
     version: "1.0.0",
     contact: {
       name: "API Support",
-              email: "support@bookpath.eu",
+              email: "support@bookpath.online",
     },
   },
   host: env.API_HOST || "localhost:3001",

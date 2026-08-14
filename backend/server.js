@@ -51,7 +51,7 @@ const swaggerOptions = {
         description: "Development server",
       },
       {
-        url: "https://api.bookpath.eu/api",
+        url: "https://api.bookpath.online/api",
         description: "Production server",
       },
     ],
@@ -79,7 +79,7 @@ securityMiddleware(app);
 // Configure CORS
 const corsOptions = {
   origin: config.NODE_ENV === "production" 
-    ? ["https://www.bookpath.eu", "https://bookpath.eu", "https://api.bookpath.eu"]
+    ? ["https://www.bookpath.online", "https://bookpath.online", "https://api.bookpath.online"]
     : ["http://localhost:3000", "http://127.0.0.1:3000"], // Allow both localhost variants
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-Requested-With"],
