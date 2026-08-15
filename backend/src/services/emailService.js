@@ -9,7 +9,7 @@ const emailConfig = getEnvConfig({
   SMTP_PORT: { type: "number", default: 587 },
   SMTP_USER: { default: "" },
   SMTP_PASS: { default: "" },
-  FRONTEND_URL: { default: "http://localhost:3000" },
+  FRONTEND_URL: { default: process.env.FRONTEND_URL || process.env.SITE_URL || "http://localhost:3000" },
   NODE_ENV: { default: "development" },
 });
 
@@ -23,8 +23,10 @@ let transporter;
  */
 async function initializeTransporter() {
   try {
-    if (emailConfig.NODE_ENV === "development") {
-      // Create a fake transporter that logs instead of sending emails
+    if (emailConfig.NODE_ENV === "development" || !emailConfig.SMTP_HOST) {
+      // Create a fake transporter that logs instead of sending emails.
+      // Also used in production when SMTP_HOST is unset — avoids creating a
+      // broken transporter (empty host) that would throw on every send.
       transporter = {
         sendMail: () => {
           logger.info("📨 Email sending disabled in development mode");
@@ -161,6 +163,34 @@ async function sendPasswordResetEmail(email, token, username) {
   });
 }
 
+/**
+ *  Send a welcome email after a user subscribes to the deals/reactivation list.
+ *  Non-critical: callers should fire-and-forget and tolerate failure (no-op
+ *  when SMTP is unconfigured — the mock transporter logs instead of sending).
+ */
+async function sendWelcomeEmail(email) {
+  const html = `
+    <div style="font-family:Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2937">
+      <h2 style="margin:0 0 12px">Welcome to BookPath 📚</h2>
+      <p>You're on the list. We'll email you when we spot genuinely good book
+         deals and recommendations in the genres you care about.</p>
+      <p>No spam, ever — just curated finds worth your time. You can unsubscribe
+         with one click on any email.</p>
+      <p style="color:#6b7280;font-size:13px">— The BookPath team</p>
+    </div>
+  `;
+  const text =
+    "Welcome to BookPath! You're on the list — we'll email you curated book deals " +
+    "and recommendations in the genres you care about. No spam, ever.";
+
+  return sendEmail({
+    to: email,
+    subject: "Welcome to BookPath — you're on the list",
+    html,
+    text,
+  });
+}
+
 // initialize transporter on import (can be moved to app startup)
 initializeTransporter();
 
@@ -169,4 +199,5 @@ export default {
   sendEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendWelcomeEmail,
 };

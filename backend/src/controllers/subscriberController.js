@@ -1,4 +1,5 @@
 import EmailSubscriber from "../models/EmailSubscriber.js";
+import emailService from "../services/emailService.js";
 import { ApiError } from "../utils/errors.js";
 import logger from "../config/logger.js";
 
@@ -26,6 +27,13 @@ class SubscriberController {
       );
 
       logger.info("Email subscriber upserted", { email: normalized, source });
+
+      // Fire-and-forget welcome email. No-op (logs only) when SMTP is
+      // unconfigured; a send failure must never fail the subscribe request.
+      emailService.sendWelcomeEmail(normalized).catch((e) =>
+        logger.warn("Welcome email skipped/failed", { email: normalized, error: e?.message })
+      );
+
       res.status(201).json({ success: true, data: { subscribed: true, email: normalized } });
     } catch (error) {
       // Duplicate-key race → treat as already subscribed, not an error.
