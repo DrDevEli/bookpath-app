@@ -9,6 +9,7 @@ const emailConfig = getEnvConfig({
   SMTP_PORT: { type: "number", default: 587 },
   SMTP_USER: { default: "" },
   SMTP_PASS: { default: "" },
+  EMAIL_FROM: { default: "noreply@bookpath.org" },
   FRONTEND_URL: { default: process.env.FRONTEND_URL || process.env.SITE_URL || "http://localhost:3000" },
   NODE_ENV: { default: "development" },
 });
@@ -80,9 +81,7 @@ async function sendEmail({ to, subject, html, text }) {
     if (!transporter) await initializeTransporter();
 
     const mailOptions = {
-      from: `"BookPath API" <${
-        emailConfig.SMTP_USER || "noreply@bookpath.org"
-      }>`,
+      from: `"BookPath" <${emailConfig.EMAIL_FROM}>`,
       to,
       subject,
       html,
