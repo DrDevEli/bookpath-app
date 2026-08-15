@@ -17,6 +17,10 @@ import Category from './pages/Category';
 import { BookSearch } from './components/BookSearch';
 import { Library } from './pages/Library';
 import { Analytics } from './pages/Analytics';
+import { About } from './pages/About';
+import { Privacy } from './pages/Privacy';
+import { Terms } from './pages/Terms';
+import { AffiliateDisclosure } from './pages/AffiliateDisclosure';
 
 // Styles
 import './App.css';
@@ -52,6 +56,10 @@ function App() {
             <Route path="/category" element={<Category />} />
             <Route path="/category/:category" element={<Category />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/affiliate-disclosure" element={<AffiliateDisclosure />} />
           </Routes>
           </main>
           <Footer />
