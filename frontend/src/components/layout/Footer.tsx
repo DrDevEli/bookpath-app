@@ -41,7 +41,19 @@ export function Footer() {
             >
               Terms
             </Link>
+            <Link
+              to="/affiliate-disclosure"
+              className="text-sm hover:opacity-80 transition-opacity"
+              style={{ color: 'rgb(30, 41, 59)' }}
+            >
+              Affiliate Disclosure
+            </Link>
           </nav>
+        </div>
+        <div className="pt-3 text-center md:text-left">
+          <p className="text-xs" style={{ color: 'rgb(100, 116, 139)' }}>
+            As an Amazon Associate, BookPath earns from qualifying purchases.
+          </p>
         </div>
       </div>
     </footer>
