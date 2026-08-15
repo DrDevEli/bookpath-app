@@ -3,7 +3,10 @@ export const DOMAIN_CONFIG = {
   // Production domain
   PRODUCTION: {
     FRONTEND: process.env.REACT_APP_FRONTEND_URL || 'https://bookpath.org',
-    BACKEND: process.env.REACT_APP_BACKEND_URL || 'https://api.bookpath.org',
+    // Same-origin API: nginx on bookpath.org proxies /api -> backend (127.0.0.1:3001).
+    // Empty string makes api.ts fall back to a relative /api base, so there is no
+    // cross-origin request, no CORS, and no api.bookpath.org DNS/cert to maintain.
+    BACKEND: process.env.REACT_APP_BACKEND_URL || '',
   },
   
   // Development domain
