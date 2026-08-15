@@ -5,11 +5,13 @@
  * Usage (from backend/):
  *   node scripts/healthCheck.js
  *
- * Env: HEALTH_URL (default http://localhost:PORT/health, PORT default 3001)
+ * Env: HEALTH_URL (default http://127.0.0.1:PORT/health, PORT default 3001)
+ * NOTE: use 127.0.0.1 (not localhost) — backend binds IPv4 loopback only, and
+ * undici's fetch resolves localhost to ::1 first without IPv4 fallback.
  */
 import "./loadEnv.js"; // MUST be first — loads backend/.env before PORT is read below
 
-const url = process.env.HEALTH_URL || `http://localhost:${process.env.PORT || 3001}/health`;
+const url = process.env.HEALTH_URL || `http://127.0.0.1:${process.env.PORT || 3001}/health`;
 
 async function main() {
   const controller = new AbortController();
