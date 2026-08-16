@@ -16,7 +16,7 @@
  * Env (all optional — service no-ops when keys absent):
  *   PA_API_ACCESS_KEY      — Access Key ID (from Amazon Associates)
  *   PA_API_SECRET_KEY      — Secret Access Key
- *   PA_API_PARTNER_TAG     — default: AMAZON_ASSOCIATES_TAG (bookpath0a-20)
+ *   PA_API_PARTNER_TAG     — default: AMAZON_ASSOCIATES_TAG (bookpath0a20-20)
  *   PA_API_HOST            — default: webservices.amazon.de
  *   PA_API_REGION          — SigV4 region, default: eu-west-1
  *   PA_API_MARKETPLACE     — default: www.amazon.de
