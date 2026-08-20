@@ -52,6 +52,7 @@ function pageUrl(type, slug) {
 }
 
 function bookDetailUrl(id) {
+  if (!id) return `${SITE_URL}/search`;
   return `${SITE_URL}/books/${encodeURIComponent(id)}`;
 }
 

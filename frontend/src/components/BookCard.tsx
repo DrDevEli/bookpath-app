@@ -84,11 +84,12 @@ export function BookCard({
 
   const detailPath = (() => {
     const id = book.openLibraryKey ? book.openLibraryKey.replace('/works/', '') : (book.id || book.bookId || '');
+    const safeId = id && id !== 'null' ? id : 'search';
     const params = new URLSearchParams();
     if (source) params.append('source', source);
     if (context) params.append('context', context);
     const qs = params.toString();
-    return qs ? `/books/${id}?${qs}` : `/books/${id}`;
+    return qs ? `/books/${safeId}?${qs}` : `/books/${safeId}`;
   })();
 
   return (
