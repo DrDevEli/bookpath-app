@@ -3,6 +3,42 @@ import logger from "../config/logger.js";
 
 const GOOGLE_BOOKS_API_BASE_URL = "https://www.googleapis.com/books/v1";
 
+// HTML entity decoding + tag stripping for Google Books descriptions.
+// Some volumes return volumeInfo.description with embedded HTML (<p>, <i>,
+// <br>) and entities (&amp;, &#8217;, ...). Strip tags, decode entities, and
+// collapse whitespace so every consumer (API, cards, SEO SSR) gets plain text.
+const NAMED_ENTITIES = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  ndash: "\u2013", mdash: "\u2014", hellip: "\u2026",
+  lsquo: "\u2018", rsquo: "\u2019", ldquo: "\u201C", rdquo: "\u201D",
+  copy: "\u00A9", reg: "\u00AE", trade: "\u2122", bull: "\u2022",
+  middot: "\u00B7", eacute: "\u00E9", aacute: "\u00E1", iacute: "\u00ED",
+  oacute: "\u00F3", uacute: "\u00FA", ntilde: "\u00F1", uuml: "\u00FC",
+  ouml: "\u00F6", auml: "\u00E4", szlig: "\u00DF", egrave: "\u00E8",
+};
+
+function decodeHtmlEntities(str) {
+  return str.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, body) => {
+    if (body[0] === "#") {
+      const isHex = body[1] === "x" || body[1] === "X";
+      const code = parseInt(isHex ? body.slice(2) : body.slice(1), isHex ? 16 : 10);
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return match;
+      }
+    }
+    return NAMED_ENTITIES[body] ?? match;
+  });
+}
+
+function cleanDescription(raw) {
+  if (!raw) return null;
+  const withoutTags = raw.replace(/<[^>]*>/g, " ");
+  const decoded = decodeHtmlEntities(withoutTags);
+  return decoded.replace(/\s+/g, " ").trim();
+}
+
 /**
  * Search Google Books API
  * @param {Object} params - Search parameters
@@ -256,8 +292,9 @@ function transformGoogleBook(item) {
     }
   }
 
-  // Extract description
-  const description = volumeInfo.description || null;
+  // Extract description (clean HTML tags + entities — some volumes embed
+  // <p>/<i>/<b> markup and &amp;/&#8217; entities in the raw text)
+  const description = cleanDescription(volumeInfo.description);
 
   // Extract average rating
   const averageRating = volumeInfo.averageRating || null;
