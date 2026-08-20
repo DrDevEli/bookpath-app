@@ -1,10 +1,10 @@
 /**
- * Truncate a long book description (Google Books synopses are often several
- * paragraphs) down to a few sentences for card / detail display.
+ * Truncate a long book description down to a concise summary.
  *
- * Also strips stray HTML tags and decodes entities as defense-in-depth — the
- * backend already cleans descriptions at the source, but stored/legacy data
- * (library/collection books) may still contain markup.
+ * Cuts ONLY at complete-sentence boundaries (never mid-sentence) and does not
+ * append an ellipsis — so the result reads as a short, complete blurb rather
+ * than a chopped fragment. Also strips stray HTML tags and decodes entities as
+ * defense-in-depth (the backend already cleans at the source).
  *
  * @param text    raw description
  * @param maxLen  hard character cap (default 200 ≈ 2–3 sentences)
@@ -39,14 +39,18 @@ export function truncateDescription(text?: string | null, maxLen = 200): string 
     .trim();
   if (cleaned.length <= maxLen) return cleaned;
 
+  // Cut at the last complete-sentence boundary within the cap — never mid-sentence.
   const window = cleaned.slice(0, maxLen);
-  const lastSentence = Math.max(
-    window.lastIndexOf('.'),
-    window.lastIndexOf('!'),
-    window.lastIndexOf('?')
+  const lastBoundary = Math.max(
+    window.lastIndexOf('. '),
+    window.lastIndexOf('! '),
+    window.lastIndexOf('? ')
   );
-  // Prefer a sentence boundary; fall back to a word boundary.
-  const cut = lastSentence > 40 ? lastSentence + 1 : window.lastIndexOf(' ');
-  const end = cut > 0 ? cut : maxLen;
-  return cleaned.slice(0, end).trim() + '…';
+  if (lastBoundary > 0) {
+    return cleaned.slice(0, lastBoundary + 1).trim();
+  }
+
+  // No sentence break inside the window — fall back to a whole-word cut.
+  const lastSpace = window.lastIndexOf(' ');
+  return cleaned.slice(0, lastSpace > 0 ? lastSpace : maxLen).trim();
 }
