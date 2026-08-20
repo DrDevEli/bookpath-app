@@ -311,8 +311,8 @@ class UserController {
       // Validate input
       if (!currentPassword || !newPassword) {
         throw new ApiError(
-          400,
-          "Current password and new password are required"
+          "Current password and new password are required",
+          400
         );
       }
 
