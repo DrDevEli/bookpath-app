@@ -21,6 +21,7 @@ import { About } from './pages/About';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { AffiliateDisclosure } from './pages/AffiliateDisclosure';
+import { NotFound } from './pages/NotFound';
 
 // Styles
 import './App.css';
@@ -60,6 +61,7 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/affiliate-disclosure" element={<AffiliateDisclosure />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
           </main>
           <Footer />
