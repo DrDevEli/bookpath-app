@@ -80,6 +80,14 @@ export function Header() {
             <>
               <Button
                 variant="ghost"
+                asChild
+                className="text-sm font-medium hover:bg-transparent"
+                style={{ color: 'rgb(219, 205, 144)' }}
+              >
+                <Link to="/profile">Profile</Link>
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={handleLogout}
                 className="text-sm font-medium hover:bg-transparent"
                 style={{ color: 'rgb(219, 205, 144)' }}

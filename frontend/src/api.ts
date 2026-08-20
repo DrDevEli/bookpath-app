@@ -31,8 +31,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Redirect to login if unauthorized
+    if (error.response?.status === 401 && !(error.config as any)?.skipAuthRedirect) {
+      // Redirect to login if unauthorized (skip for endpoints that handle 401 themselves, e.g. change-password)
       localStorage.removeItem('auth_token');
       window.location.href = '/login';
     }
@@ -68,6 +68,16 @@ export const analyticsAPI = {
   getTopBooks: (days = 30, limit = 10) => api.get('/analytics/top-books', { params: { days, limit } }),
   getTopQueries: (days = 30, limit = 10) => api.get('/analytics/top-queries', { params: { days, limit } }),
   getDaily: (days = 14) => api.get('/analytics/daily', { params: { days } }),
+};
+
+// User / profile (account settings)
+export const userAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data: { username?: string; email?: string }) => api.put('/users/profile', data),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.put('/users/password', { currentPassword, newPassword }, { skipAuthRedirect: true } as any),
+  getPreferences: () => api.get('/users/preferences'),
+  updatePreferences: (preferences: Record<string, unknown>) => api.put('/users/preferences', { preferences }),
 };
 
 // Price helper - returns the best display price from API response
