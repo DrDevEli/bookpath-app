@@ -27,6 +27,13 @@ const featuredBooks = [
     cover: "https://covers.openlibrary.org/b/isbn/9780099289524-L.jpg",
     description: "A Cape Town professor's fall and a daughter's ordeal in post-apartheid South Africa.",
   },
+  {
+    id: "google-fh-eCgAAQBAJ",
+    title: "Homegoing",
+    author: "Yaa Gyasi",
+    cover: "https://covers.openlibrary.org/b/id/8081171-L.jpg",
+    description: "Two half-sisters born in eighteenth-century Ghana, and the generations that follow across continents.",
+  },
 ];
 
 export default function FeaturedBooks() {

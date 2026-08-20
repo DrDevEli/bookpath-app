@@ -87,6 +87,13 @@ router.get(
   BookController.searchBooks
 );
 
+// Autocomplete suggestions for partial title/author input
+router.get(
+  "/suggest",
+  rateLimiterMiddleware,
+  BookController.suggest
+);
+
 /**
  * @swagger
  * /books/advanced:

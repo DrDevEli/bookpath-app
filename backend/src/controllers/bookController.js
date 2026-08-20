@@ -1,7 +1,7 @@
 import BookSearchService from "../services/bookSearchService.js";
 import advancedSearchService from "../services/advancedSearchService.js";
 // import openLibraryService from "../services/openLibraryService.js"; // COMMENTED OUT FOR TESTING - Google Books only
-import { getGoogleBookById } from "../services/googleBooksService.js";
+import { getGoogleBookById, searchGoogleBooks } from "../services/googleBooksService.js";
 import amazonAffiliateService from "../services/amazonAffiliateService.js";
 import featuredBooksService from "../services/featuredBooksService.js";
 import analyticsService from "../services/analyticsService.js";
@@ -50,6 +50,25 @@ class BookController {
         req,
       });
       res.json({ success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async suggest(req, res, next) {
+    try {
+      const q = (req.query.q || "").toString().trim();
+      if (!q) {
+        return res.json({ success: true, data: [] });
+      }
+      const results = await searchGoogleBooks({ title: q, page: 1 });
+      const suggestions = results.slice(0, 8).map((b) => ({
+        id: b.id,
+        title: b.title,
+        authors: b.authors || [],
+        coverImage: b.coverImage || null,
+      }));
+      res.json({ success: true, data: suggestions });
     } catch (error) {
       next(error);
     }
