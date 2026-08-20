@@ -106,7 +106,7 @@ const userSchema = new mongoose.Schema({
     google: String,
     github: String,
   },
-});
+}, { timestamps: true });
 
 // Indexes are already defined in the schema with unique: true
 
