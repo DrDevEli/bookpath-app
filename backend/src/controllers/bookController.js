@@ -462,6 +462,7 @@ class BookController {
           book = {
             title: googleBook.title,
             authors: googleBook.authors || googleBook.authorNames || [],
+            coverImage: googleBook.coverImage || null,
           };
         } catch (googleError) {
           logger.warn("Affiliate click: Google Books lookup failed", {

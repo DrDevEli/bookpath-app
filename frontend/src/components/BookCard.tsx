@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
+import { truncateDescription } from '../lib/truncate';
 
 interface Book {
   id?: string;
@@ -142,8 +143,8 @@ export function BookCard({
         )}
         
         {book.description && (
-          <div className="text-xs mb-2 line-clamp-3" title={book.description} style={{ color: 'rgb(30, 41, 59)' }}>
-            {book.description}
+          <div className="text-xs mb-2 line-clamp-3" title={truncateDescription(book.description)} style={{ color: 'rgb(30, 41, 59)' }}>
+            {truncateDescription(book.description)}
           </div>
         )}
 

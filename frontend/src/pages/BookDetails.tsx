@@ -10,6 +10,7 @@ import * as z from 'zod';
 import api from '../api';
 import { isAuthenticated } from '../auth';
 import { EmailDeals } from '../components/EmailDeals';
+import { truncateDescription } from '../lib/truncate';
 
 interface Book {
   id: string;
@@ -421,7 +422,7 @@ export function BookDetails() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground leading-relaxed">
-                  {book.description}
+                  {truncateDescription(book.description)}
                 </p>
               </CardContent>
             </Card>
