@@ -32,6 +32,13 @@ interface Book {
   price?: number; // <-- Add this line
 }
 
+interface Suggestion {
+  id: string;
+  title: string;
+  authors?: string[];
+  coverImage?: string;
+}
+
 interface Pagination {
   currentPage: number;
   totalPages: number;
@@ -69,10 +76,12 @@ export function BookSearch() {
   // Store last search query for pagination
   const [lastSearchTitle, setLastSearchTitle] = useState<string>('');
   const [lastSearchAuthor, setLastSearchAuthor] = useState<string>('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const isLoggedIn = isAuthenticated();
   const { toast } = useToast();
 
-  const { register, handleSubmit } = useForm<BookSearchForm>();
+  const { register, handleSubmit, watch, setValue } = useForm<BookSearchForm>();
   const {
     register: registerCollection,
     handleSubmit: handleCollectionSubmit,
@@ -90,6 +99,29 @@ export function BookSearch() {
       fetchCollections();
     }
   }, [isLoggedIn]);
+
+  const watchedTitle = watch('title');
+
+  // Autocomplete: debounce partial-title input → fetch suggestions
+  useEffect(() => {
+    const q = (watchedTitle || '').trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.get('/books/suggest', { params: { q } });
+        setSuggestions(res.data?.data || []);
+        setShowSuggestions(true);
+      } catch {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [watchedTitle]);
 
   const fetchCollections = async () => {
     try {
@@ -261,20 +293,46 @@ export function BookSearch() {
         <CardHeader>
           <CardTitle className="text-primary text-2xl font-bold">Book Search</CardTitle>
           <CardDescription className="text-text-secondary">
-            Search for books by title or author using Open Library
+            Search for books by title or author using Google Books
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="title" className="text-text-primary">Book Title</Label>
               <Input
                 id="title"
                 placeholder="Enter book title"
                 {...register("title")}
                 disabled={loading}
+                autoComplete="off"
                 className="bg-muted border-0 focus:ring-2 focus:ring-primary text-text-primary"
               />
+              {showSuggestions && suggestions.length > 0 && (
+                <ul className="absolute z-20 w-full mt-1 max-h-64 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                  {suggestions.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setValue('title', s.title);
+                          if (s.authors?.length) setValue('author', s.authors[0]);
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        {s.coverImage ? (
+                          <img src={s.coverImage} alt="" className="w-6 h-9 object-cover rounded flex-shrink-0" />
+                        ) : null}
+                        <span className="truncate text-text-primary">
+                          <span className="font-medium">{s.title}</span>
+                          {s.authors?.length ? <span className="text-text-secondary"> — {s.authors[0]}</span> : null}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
