@@ -16,7 +16,6 @@ const suggestedBooks = [
     cover: "https://covers.openlibrary.org/b/id/12749894-L.jpg",
     rating: 4.5,
     genre: "Fiction",
-    price: 17.99
   },
   {
     id: 5,
@@ -26,7 +25,6 @@ const suggestedBooks = [
     cover: "https://covers.openlibrary.org/b/id/12749895-L.jpg",
     rating: 4.8,
     genre: "Non-Fiction",
-    price: 22.49
   },
   {
     id: 6,
@@ -36,7 +34,6 @@ const suggestedBooks = [
     cover: "https://covers.openlibrary.org/b/id/12749896-L.jpg",
     rating: 4.3,
     genre: "Fiction",
-    price: 14.25
   },
   {
     id: 7,
@@ -46,7 +43,6 @@ const suggestedBooks = [
     cover: "https://covers.openlibrary.org/b/id/12749897-L.jpg",
     rating: 4.7,
     genre: "Self-Help",
-    price: 19.75
   }
 ];
 
@@ -237,11 +233,6 @@ export function Home() {
                       <span className="inline-block px-1.5 py-0.5 text-[10px] rounded-full transition-all duration-300 hover:scale-105" style={{ backgroundColor: 'rgba(94, 234, 212, 0.2)', color: 'rgb(94, 234, 212)', border: '1px solid rgba(94, 234, 212, 0.3)' }}>
                         {book.genre}
                       </span>
-                      {typeof book.price === 'number' && (
-                        <span className="inline-block mt-1 px-1.5 py-0.5 bg-gradient-to-r from-yellow-200 via-yellow-300 to-yellow-400 text-yellow-900 text-[10px] font-bold rounded-full shadow-sm border border-yellow-300 ml-1">
-                          ${book.price.toFixed(2)}
-                        </span>
-                      )}
                     </div>
                   </div>
                   <p className="text-xs text-white/70 mt-1 line-clamp-2 transition-all duration-300 hover:text-white/80">
