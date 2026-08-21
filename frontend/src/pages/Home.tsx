@@ -14,7 +14,6 @@ const suggestedBooks = [
     author: "Paulo Coelho",
     description: "A magical story about following your dreams and listening to your heart.",
     cover: "https://covers.openlibrary.org/b/id/12749894-L.jpg",
-    rating: 4.5,
     genre: "Fiction",
   },
   {
@@ -23,7 +22,6 @@ const suggestedBooks = [
     author: "Yuval Noah Harari",
     description: "A brief history of humankind, from ancient humans to the present day.",
     cover: "https://covers.openlibrary.org/b/id/12749895-L.jpg",
-    rating: 4.8,
     genre: "Non-Fiction",
   },
   {
@@ -32,7 +30,6 @@ const suggestedBooks = [
     author: "Matt Haig",
     description: "Between life and death there is a library, and within that library, the shelves go on forever.",
     cover: "https://covers.openlibrary.org/b/id/12749896-L.jpg",
-    rating: 4.3,
     genre: "Fiction",
   },
   {
@@ -41,7 +38,6 @@ const suggestedBooks = [
     author: "James Clear",
     description: "Tiny changes, remarkable results: An easy & proven way to build good habits & break bad ones.",
     cover: "https://covers.openlibrary.org/b/id/12749897-L.jpg",
-    rating: 4.7,
     genre: "Self-Help",
   }
 ];
@@ -129,10 +125,6 @@ export function Home() {
     }
   }, [showSuggestions]);
 
-  const getRatingStars = (rating: number) => {
-    return '⭐'.repeat(Math.round(rating)) + '☆'.repeat(5 - Math.round(rating));
-  };
-
   return (
     <div className="relative min-h-screen">
       {/* Top Section with Hero and Suggestions */}
@@ -191,11 +183,11 @@ export function Home() {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
                 <CardTitle className="text-base text-white animate-fade-in" style={{ textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' }}>
-                  AI Suggestions
+                  Popular right now
                 </CardTitle>
               </div>
               <CardDescription className="text-white/80 animate-fade-in-delayed text-xs">
-                Personalized recommendations just for you
+                Titles readers are exploring
               </CardDescription>
             </CardHeader>
             
@@ -222,14 +214,6 @@ export function Home() {
                       <p className="text-xs text-white/80 mb-1 transition-colors duration-300 hover:text-white/90">
                         by {book.author}
                       </p>
-                      <div className="flex items-center gap-1 mb-1">
-                        <span className="text-xs animate-pulse" style={{ color: 'rgb(250, 204, 21)' }}>
-                          {getRatingStars(book.rating)}
-                        </span>
-                        <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                          {book.rating}
-                        </span>
-                      </div>
                       <span className="inline-block px-1.5 py-0.5 text-[10px] rounded-full transition-all duration-300 hover:scale-105" style={{ backgroundColor: 'rgba(94, 234, 212, 0.2)', color: 'rgb(94, 234, 212)', border: '1px solid rgba(94, 234, 212, 0.3)' }}>
                         {book.genre}
                       </span>
@@ -254,8 +238,8 @@ export function Home() {
                     />
                   ))}
                 </div>
-                <Button variant="outline" size="sm" className="bg-white/10 text-white border-white/30 hover:bg-white/20 transition-all duration-300 hover:scale-105 px-2 py-0.5 text-xs">
-                  View All
+                <Button asChild variant="outline" size="sm" className="bg-white/10 text-white border-white/30 hover:bg-white/20 transition-all duration-300 hover:scale-105 px-2 py-0.5 text-xs">
+                  <Link to="/search">View All</Link>
                 </Button>
               </div>
             </CardFooter>
