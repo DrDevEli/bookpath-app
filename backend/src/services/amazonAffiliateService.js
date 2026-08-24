@@ -2,9 +2,27 @@ import logger from "../config/logger.js";
 
 class AmazonAffiliateService {
   constructor() {
-    this.associateTag = process.env.AMAZON_ASSOCIATES_TAG || null;
-    this.amazonDomain = process.env.AMAZON_DOMAIN || "amazon.de";
-    
+    this.defaultMarket = (process.env.AMAZON_DEFAULT_MARKET || "de").toLowerCase();
+
+    // Marketplace map: market code -> { domain, tag }.
+    // DE is always present (existing env). US is opt-in — active only when a US tag is configured.
+    this.marketplaces = {
+      de: {
+        domain: process.env.AMAZON_DOMAIN || "amazon.de",
+        tag: process.env.AMAZON_ASSOCIATES_TAG || null,
+      },
+    };
+    if (process.env.AMAZON_US_ASSOCIATES_TAG) {
+      this.marketplaces.us = {
+        domain: process.env.AMAZON_US_DOMAIN || "amazon.com",
+        tag: process.env.AMAZON_US_ASSOCIATES_TAG,
+      };
+    }
+
+    // Backward-compat properties (default = DE marketplace)
+    this.associateTag = this.marketplaces.de.tag;
+    this.amazonDomain = this.marketplaces.de.domain;
+
     if (!this.associateTag) {
       logger.warn(
         "Amazon Associates tag not configured. Affiliate links will not be generated."
@@ -13,14 +31,37 @@ class AmazonAffiliateService {
   }
 
   /**
+   * Resolve a market code to its { domain, tag }. Invalid/unknown codes
+   * fall back to the default market so a bad ?market= can never kill a link.
+   * @param {string} [market] - Market code ("de" | "us")
+   * @returns {{domain: string, tag: string|null}|null}
+   */
+  getMarket(market) {
+    const key = (market || this.defaultMarket || "de").toLowerCase();
+    return this.marketplaces[key] || this.marketplaces[this.defaultMarket] || null;
+  }
+
+  /**
+   * List market codes that have a configured tag.
+   * @returns {string[]}
+   */
+  availableMarkets() {
+    return Object.entries(this.marketplaces)
+      .filter(([, m]) => !!m.tag)
+      .map(([code]) => code);
+  }
+
+  /**
    * Generate Amazon affiliate link for a book
    * @param {Object} params - Book parameters
    * @param {string} params.title - Book title
    * @param {string[]} [params.authors] - Array of author names
+   * @param {string} [params.market] - Target marketplace ("de" | "us", default from env)
    * @returns {Promise<string|null>} Amazon affiliate URL or null if tag not configured
    */
-  async generateAffiliateLink({ title, authors = [] }) {
-    if (!this.associateTag) {
+  async generateAffiliateLink({ title, authors = [], market }) {
+    const m = this.getMarket(market);
+    if (!m || !m.tag) {
       logger.debug("Amazon Associates tag not configured, skipping affiliate link");
       return null;
     }
@@ -44,13 +85,14 @@ class AmazonAffiliateService {
       const encodedQuery = encodeURIComponent(searchQuery.trim());
 
       // Build Amazon search URL with affiliate tag
-      // Format: https://amazon.de/s?k=search+query&tag=associate_tag
-      const affiliateUrl = `https://${this.amazonDomain}/s?k=${encodedQuery}&tag=${this.associateTag}`;
+      // Format: https://<domain>/s?k=search+query&tag=associate_tag
+      const affiliateUrl = `https://${m.domain}/s?k=${encodedQuery}&tag=${m.tag}`;
 
       logger.debug("Generated Amazon affiliate link", {
         title,
         authors,
-        domain: this.amazonDomain,
+        domain: m.domain,
+        market: (market || this.defaultMarket).toLowerCase(),
       });
 
       return affiliateUrl;

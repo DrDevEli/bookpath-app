@@ -47,6 +47,10 @@ const analyticsEventSchema = new mongoose.Schema(
     coverImage: { type: String, trim: true },
     amazonUrl: { type: String, trim: true },
 
+    // Which marketplace the affiliate link targeted (de = amazon.de, us = amazon.com).
+    // Lets the dashboard split revenue/CTR by storefront.
+    market: { type: String, enum: ["de", "us"], default: "de", index: true },
+
     // A/B test variant of the CTA that produced this click (e.g. "buy", "price").
     // Lets the dashboard compare click-through by CTA copy.
     variant: { type: String, trim: true },

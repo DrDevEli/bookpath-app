@@ -42,6 +42,7 @@ class AnalyticsService {
     coverImage,
     amazonUrl,
     variant = null,
+    market = "de",
     userId = null,
     req = null,
   }) {
@@ -56,6 +57,7 @@ class AnalyticsService {
       coverImage: coverImage || null,
       amazonUrl: amazonUrl || null,
       variant: variant || null,
+      market: market === "us" ? "us" : "de",
       userId: userId || undefined,
       ipAddress: req?.ip,
       userAgent: req?.headers?.["user-agent"],

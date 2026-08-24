@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { isAuthenticated, logout, getUserRole } from '../../auth';
+import { getMarket, setMarket, type Market } from '../../lib/market';
 
 export function Header() {
   const navigate = useNavigate();
   const loggedIn = isAuthenticated();
   const role = getUserRole();
+  const [market, setMarketState] = useState<Market>(getMarket());
+
+  const handleMarketChange = (m: Market) => {
+    setMarket(m);
+    setMarketState(m);
+  };
 
   const handleLogout = () => {
     logout();
@@ -76,6 +83,23 @@ export function Header() {
 
         {/* Auth Buttons */}
         <div className="flex items-center gap-3">
+          {/* Storefront toggle — picks the Amazon marketplace for affiliate links */}
+          <div className="flex items-center gap-1 border border-gray-200 rounded-full px-1 py-0.5 bg-white/60 backdrop-blur-sm">
+            {(['de', 'us'] as Market[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => handleMarketChange(m)}
+                className={`px-2 py-1 rounded-full text-xs font-medium transition-all duration-300 ${
+                  market === m
+                    ? 'bg-gradient-to-r from-primary to-teal text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+                title={m === 'de' ? 'Amazon.de store' : 'Amazon.com store'}
+              >
+                {m === 'de' ? '🇩🇪 DE' : '🇺🇸 US'}
+              </button>
+            ))}
+          </div>
           {loggedIn ? (
             <>
               <Button
