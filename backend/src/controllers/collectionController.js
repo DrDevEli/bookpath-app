@@ -509,8 +509,8 @@ class CollectionController {
           basic: collection.stats,
           readingStats,
           favoriteCount: favoriteBooks.length,
-          genreDistribution: this.getGenreDistribution(collection.books),
-          readingProgress: this.getReadingProgress(collection.books),
+          genreDistribution: CollectionController.getGenreDistribution(collection.books),
+          readingProgress: CollectionController.getReadingProgress(collection.books),
         },
       });
     } catch (error) {

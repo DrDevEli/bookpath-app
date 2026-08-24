@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,11 +41,23 @@ interface LibraryStats {
   averageRating: number;
 }
 
+interface CollectionSummary {
+  _id: string;
+  name: string;
+  description?: string;
+  category: string;
+  color: string;
+  isPublic: boolean;
+  bookCount: number;
+  completedCount: number;
+}
+
 interface LibraryResponse {
   success: boolean;
   data: {
     books: LibraryBook[];
     stats?: LibraryStats;
+    collections?: CollectionSummary[];
   };
 }
 
@@ -84,6 +97,7 @@ const shelves: Shelf[] = [
 
 export function Library() {
   const [books, setBooks] = useState<LibraryBook[]>([]);
+  const [collections, setCollections] = useState<CollectionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeShelf, setActiveShelf] = useState<string>('want-to-read');
@@ -102,6 +116,7 @@ export function Library() {
       const response = await api.get<LibraryResponse>('/library');
       if (response.data.success) {
         setBooks(response.data.data.books || []);
+        setCollections(response.data.data.collections || []);
       }
     } catch (err: any) {
       const errorMsg =
@@ -382,6 +397,50 @@ export function Library() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Collections Summary */}
+      {collections.length > 0 && (
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-xl font-semibold" style={{ color: '#dbcd90' }}>
+              My Collections
+            </h2>
+            <Link
+              to="/collections"
+              className="text-sm text-primary hover:underline"
+            >
+              Manage →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {collections.map((c) => (
+              <Link key={c._id} to={`/collections/${c._id}`}>
+                <Card
+                  className="hover:shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                  style={{ borderLeft: `4px solid ${c.color}` }}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      {c.name}
+                      {c.isPublic && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                          Public
+                        </span>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-4 text-sm text-muted-foreground">
+                      <span>📚 {c.bookCount} books</span>
+                      <span>✅ {c.completedCount} completed</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Shelf Tabs */}
       <div className="flex gap-2 flex-wrap">

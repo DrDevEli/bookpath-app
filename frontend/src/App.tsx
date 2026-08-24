@@ -13,6 +13,7 @@ import { Register } from './pages/Register';
 import { BookDetails } from './pages/BookDetails';
 import { Collections } from './pages/Collections';
 import { CollectionDetail } from './pages/CollectionDetail';
+import { SharedCollection } from './pages/SharedCollection';
 import Category from './pages/Category';
 import { BookSearch } from './components/BookSearch';
 import { Library } from './pages/Library';
@@ -54,6 +55,7 @@ function App() {
             <Route path="/books/:id" element={<BookDetails />} />
             <Route path="/collections" element={<Collections />} />
             <Route path="/collections/:id" element={<CollectionDetail />} />
+            <Route path="/shared/:shareableLink" element={<SharedCollection />} />
             <Route path="/library" element={<Library />} />
             <Route path="/category" element={<Category />} />
             <Route path="/category/:category" element={<Category />} />

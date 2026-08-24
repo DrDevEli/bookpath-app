@@ -148,7 +148,7 @@ class LibraryService {
 
   /**
    * Aggregate all user books into shelves and compute stats.
-   * getLibrary(userId) -> { shelves, stats }
+   * getLibrary(userId) -> { books, shelves, stats, collections }
    */
   async getLibrary(userId) {
     try {
@@ -205,7 +205,20 @@ class LibraryService {
 
       logger.info("Library aggregated", { userId, totalBooks, completedBooks });
 
-      return { shelves, stats };
+      // Build collections summary (all user collections incl. the default library)
+      const allCollections = await BookCollection.find({ user: userId });
+      const collections = allCollections.map((c) => ({
+        _id: c._id,
+        name: c.name,
+        description: c.description,
+        category: c.category,
+        color: c.color,
+        isPublic: c.isPublic,
+        bookCount: c.books.length,
+        completedCount: c.books.filter((b) => b.readStatus === "completed").length,
+      }));
+
+      return { books, shelves, stats, collections };
     } catch (error) {
       logger.error("getLibrary error", { userId, error: error.message });
       throw new ApiError(`Library aggregation failed: ${error.message}`, 500);
