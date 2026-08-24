@@ -509,10 +509,12 @@ class BookController {
         throw new ApiError("Book not found. Only Google Books is currently supported.", 404);
       }
       
-      // Generate affiliate link
+      // Generate affiliate link for the requested marketplace (default DE)
+      const { market } = req.query;
       const amazonLink = await amazonAffiliateService.generateAffiliateLink({
         title: book.title,
-        authors: book.authors || []
+        authors: book.authors || [],
+        market,
       });
 
       if (!amazonLink) {
@@ -532,6 +534,7 @@ class BookController {
         coverImage: book.coverImage || null,
         amazonUrl: amazonLink,
         variant: variant || null,
+        market: market === "us" ? "us" : "de",
         userId: req.user?.id || null,
         req,
       });
