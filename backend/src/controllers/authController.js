@@ -19,6 +19,7 @@ import User from "../models/User.js";
 import { ApiError } from "../utils/errors.js";
 import { generateTokens } from "../utils/jwtUtils.js";
 import { isJwtBlacklisted, whitelistJwt } from "../utils/authRedisUtils.js";
+import redis from "../utils/redis.js";
 import logger from "../config/logger.js";
 import * as emailVerificationController from "./emailVerificationController.js";
 import * as passwordResetController from "./passwordResetController.js";
@@ -310,7 +311,6 @@ class AuthController {
       );
 
       // Blacklist old refresh token
-      const redis = require("../utils/redis.js").default;
       await redis.set(
         `jwt:blacklist:${decoded.jti}`,
         "1",

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import crypto from "crypto";
 import logger from "../config/logger.js";
 
 const bookCollectionSchema = new mongoose.Schema(
@@ -213,8 +214,10 @@ bookCollectionSchema.methods.getFavoriteBooks = function () {
 // Method to generate shareable link
 bookCollectionSchema.methods.generateShareableLink = function () {
   if (!this.shareableLink) {
-    this.shareableLink = require('crypto').randomBytes(16).toString('hex');
+    this.shareableLink = crypto.randomBytes(16).toString("hex");
   }
+  // A shared link implies public read access — the public lookup filters isPublic:true
+  this.isPublic = true;
   return this.shareableLink;
 };
 
