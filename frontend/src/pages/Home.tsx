@@ -54,12 +54,12 @@ export function Home() {
     matchScore: number;
     reason: string;
     similarTo: string;
-    coverImage?: string;
   }
   const [aiRecommendations, setAiRecommendations] = useState<Recommendation[]>([]);
   const [recsLoading, setRecsLoading] = useState(false);
   const [recsError, setRecsError] = useState<string | null>(null);
   const [recsEmpty, setRecsEmpty] = useState(false);
+  const [recsNote, setRecsNote] = useState<string | null>(null);
   const [recsRefreshing, setRecsRefreshing] = useState(false);
 
   const fetchRecommendations = useCallback(async () => {
@@ -67,14 +67,30 @@ export function Home() {
     setRecsLoading(true);
     setRecsError(null);
     setRecsEmpty(false);
+    setRecsNote(null);
     try {
       const res = await recommendationsAPI.getRecommendations();
-      const data = res.data;
-      const recs = Array.isArray(data?.recommendations) ? data.recommendations : Array.isArray(data) ? data : [];
+      // API nests recommendations at body.data.recommendations
+      const body = res.data;
+      const rawRecs = Array.isArray(body?.data?.recommendations)
+        ? body.data.recommendations
+        : [];
+      // Normalize backend shape ({authors: string[]}) to what the cards render ({author})
+      const recs: Recommendation[] = rawRecs.slice(0, 5).map((r: any) => ({
+        id: r.title || String(Math.random()),
+        title: r.title || 'Untitled',
+        author: Array.isArray(r.authors)
+          ? r.authors[0] || 'Unknown'
+          : r.author || 'Unknown',
+        matchScore: r.matchScore ?? 50,
+        reason: r.reason || '',
+        similarTo: r.similarTo || '',
+      }));
       if (recs.length === 0) {
         setRecsEmpty(true);
+        setRecsNote(body?.note || body?.data?.note || null);
       }
-      setAiRecommendations(recs.slice(0, 5));
+      setAiRecommendations(recs);
     } catch (err: any) {
       if (err.response?.status === 404 || err.response?.data?.message?.includes('more books')) {
         setRecsEmpty(true);
@@ -344,7 +360,7 @@ export function Home() {
               }}
             >
               <p className="text-white/70 text-sm">
-                Add more books to your library to unlock AI-powered recommendations!
+                {recsNote || 'Add more books to your library to unlock AI-powered recommendations!'}
               </p>
             </div>
           )}
