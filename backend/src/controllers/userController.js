@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { ApiError } from "../utils/errors.js";
 import { generateTokens } from "../utils/jwtUtils.js";
 import logger from "../config/logger.js";
-import crypto from "crypto";
+import { sendVerificationEmail } from "./emailVerificationController.js";
 import {
   incrementLoginAttempts,
   clearLoginAttempts,
@@ -45,14 +45,14 @@ class UserController {
         },
       });
 
-      // Generate verification token
-      const verificationToken = crypto.randomBytes(32).toString("hex");
-      user.emailVerificationToken = verificationToken;
-      user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-      await user.save();
-
-      // Send verification email (implementation would be in a separate service)
-      // await emailService.sendVerificationEmail(user.email, verificationToken);
+      // Generate verification token + send verification email (fire-and-forget —
+      // a send failure must not block or fail registration)
+      sendVerificationEmail(user).catch((err) =>
+        logger.error("Registration: verification email send failed", {
+          userId: user._id,
+          error: err.message,
+        })
+      );
 
       // Log user creation
       const AuditLog = mongoose.model("AuditLog");
