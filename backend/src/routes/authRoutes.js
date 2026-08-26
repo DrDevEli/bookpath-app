@@ -320,11 +320,7 @@ router.get("/validate-reset-token/:token", async (req, res, next) => {
   }
 });
 
-// Email verification
-router.get(
-  "/verify-email/:token",
-  emailVerificationController.sendVerificationEmail
-);
+// Email verification (verify-email GET is registered above with AuthController.verifyEmail)
 router.post(
   "/resend-verification",
   authMiddleware(),

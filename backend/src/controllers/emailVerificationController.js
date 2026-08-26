@@ -116,8 +116,8 @@ export async function resendVerificationEmail(email) {
       user.emailVerificationExpires > new Date(Date.now() + 15 * 60 * 1000)
     ) {
       throw new ApiError(
-        429,
-        "Verification email was sent recently. Please check your inbox or try again later."
+        "Verification email was sent recently. Please check your inbox or try again later.",
+        429
       );
     }
 

@@ -24,6 +24,7 @@ import { Terms } from './pages/Terms';
 import { AffiliateDisclosure } from './pages/AffiliateDisclosure';
 import { NotFound } from './pages/NotFound';
 import { Profile } from './pages/Profile';
+import { VerifyEmail } from './pages/VerifyEmail';
 
 // Styles
 import './App.css';
@@ -61,6 +62,7 @@ function App() {
             <Route path="/category/:category" element={<Category />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/verify-email/:token" element={<VerifyEmail />} />
             <Route path="/about" element={<About />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
