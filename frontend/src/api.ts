@@ -27,14 +27,56 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle auth errors
+// Tracks an in-flight silent refresh so concurrent 401s share one call.
+let refreshPromise: Promise<boolean> | null = null;
+
+const performRefresh = (): Promise<boolean> => {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
+      .then((res) => {
+        const { accessToken } = res.data;
+        if (accessToken) {
+          localStorage.setItem('auth_token', accessToken);
+          return true;
+        }
+        return false;
+      })
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+};
+
+// Add response interceptor to handle auth errors:
+// 401 -> one silent refresh attempt (httpOnly cookie) -> retry once.
+// Only if refresh fails do we clear state and send the user to /login.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && !(error.config as any)?.skipAuthRedirect) {
-      // Redirect to login if unauthorized (skip for endpoints that handle 401 themselves, e.g. change-password)
+  async (error) => {
+    const config = error.config as any;
+    // Never auto-redirect for endpoints that handle 401 themselves
+    // (e.g. change-password wrong current password).
+    if (config?.skipAuthRedirect) {
+      return Promise.reject(error);
+    }
+
+    if (error.response?.status === 401 && !config?._retried) {
+      const ok = await performRefresh();
+      if (ok) {
+        config._retried = true;
+        const token = localStorage.getItem('auth_token');
+        config.headers.Authorization = `Bearer ${token}`;
+        return api(config);
+      }
+      // Refresh failed — session is truly dead.
       localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      localStorage.removeItem('bp_session');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

@@ -1,12 +1,21 @@
 import Joi from "joi";
 import { ApiError } from "../utils/errors.js";
 
+// Password policy MUST mirror the mongoose validator in src/models/User.js
+// (audit L2): >=12 chars AND uppercase + lowercase + number + special char.
+// Keeping Joi looser than the model caused register to 500 instead of 400.
+const PASSWORD_RE =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{12,}$/;
+
 // User validation schemas
 export const userSchemas = {
   register: Joi.object({
     username: Joi.string().alphanum().min(3).max(30).required(),
     email: Joi.string().email().required(),
-    password: Joi.string().min(6).required(),
+    password: Joi.string().min(12).max(128).pattern(PASSWORD_RE).required().messages({
+      "string.pattern.base":
+        "Password must be at least 12 characters and contain uppercase, lowercase, numbers and special characters",
+    }),
   }),
 
   login: Joi.object({
@@ -24,7 +33,10 @@ export const userSchemas = {
 
   changePassword: Joi.object({
     currentPassword: Joi.string().required(),
-    newPassword: Joi.string().min(6).required(),
+    newPassword: Joi.string().min(12).max(128).pattern(PASSWORD_RE).required().messages({
+      "string.pattern.base":
+        "Password must be at least 12 characters and contain uppercase, lowercase, numbers and special characters",
+    }),
   }),
 };
 

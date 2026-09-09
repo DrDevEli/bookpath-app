@@ -2,11 +2,12 @@ import User from "../models/User.js";
 import mongoose from "mongoose";
 import { ApiError } from "../utils/errors.js";
 import { generateTokens } from "../utils/jwtUtils.js";
+import { setRefreshCookie, clearRefreshCookie } from "../utils/refreshCookie.js";
 import logger from "../config/logger.js";
 import { sendVerificationEmail } from "./emailVerificationController.js";
 import {
-  incrementLoginAttempts,
-  clearLoginAttempts,
+  recordFailedLogin,
+  clearFailedLogins,
   removeFromWhitelist,
   blacklistJwt,
 } from "../utils/authRedisUtils.js";
@@ -93,13 +94,6 @@ class UserController {
         throw new ApiError("Email/username and password are required", 400);
       }
 
-      // Check login attempts (use identifier for rate limiting)
-      const attempts = await incrementLoginAttempts(identifier);
-      if (attempts > 5) {
-        logger.warn("Too many login attempts", { identifier });
-        throw new ApiError("Too many login attempts. Try again later.", 429);
-      }
-
       // Find user by email or username
       // Treat as email if it contains @, otherwise treat as username
       const isEmail = identifier.includes('@');
@@ -110,10 +104,13 @@ class UserController {
       const user = await User.findOne(query).select("+password +accountLockedUntil");
 
       if (!user) {
+        // Generic message + do NOT count failures for unknown identifiers
+        // (counting them let attackers burn the counter on non-existent
+        // accounts and enabled enumeration-by-lockout).
         throw new ApiError("Invalid credentials", 401);
       }
 
-      // Check if account is locked
+      // Check if account is locked (cheap pre-bcrypt rejection)
       if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
         logger.warn("Login attempt on locked account", { userId: user._id });
         throw new ApiError("Account is locked. Try again later.", 403);
@@ -133,16 +130,23 @@ class UserController {
           req
         );
 
+        // Count ONLY real failures (existing account, wrong password), with
+        // the client IP. Hard-lock happens only when failures come from a
+        // single source (<=2 distinct IPs) — cross-IP attempts cannot be
+        // used to lock a victim's account (audit L1).
+        await recordFailedLogin(identifier, req.ip);
+
         logger.warn("Failed login attempt - incorrect password", {
           userId: user._id,
+          ip: req.ip,
         });
         throw new ApiError("Invalid credentials", 401);
       }
 
       // Clear login attempts on successful login (use both email and username for clearing)
-      await clearLoginAttempts(identifier);
-      await clearLoginAttempts(user.email);
-      await clearLoginAttempts(user.username);
+      await clearFailedLogins(identifier);
+      await clearFailedLogins(user.email);
+      await clearFailedLogins(user.username);
 
       // Check if 2FA is enabled
       if (user.twoFactorEnabled) {
@@ -155,7 +159,11 @@ class UserController {
 
       // Generate tokens (ensure role has a default value)
       const userRole = user.role || "user";
-      const { accessToken, refreshToken } = await generateTokens(user._id, userRole);
+      const { accessToken, refreshToken } = await generateTokens(user._id, userRole, user.tokenVersion);
+
+      // Persist the refresh token in an httpOnly cookie (M3) — keeps the
+      // long-lived credential out of localStorage/XSS reach.
+      setRefreshCookie(res, refreshToken);
 
       // Log successful login
       const AuditLog = mongoose.model("AuditLog");
@@ -227,17 +235,27 @@ class UserController {
 
   static async logout(req, res, next) {
     try {
-      const { jti } = req.user;
+      // Remove the httpOnly refresh cookie even if the access token is already
+      // expired/invalid (that's the whole point of "log out").
+      clearRefreshCookie(res);
 
-      // Remove from whitelist and add to blacklist
-      await removeFromWhitelist(jti, req.user.id);
-      await blacklistJwt(jti, parseInt(process.env.JWT_EXPIRES_IN) || 3600);
+      const { jti } = req.user || {};
 
-      // Log logout event
-      const AuditLog = mongoose.model("AuditLog");
-      await AuditLog.logAction(req.user.id, "logout", {}, req);
+      if (jti) {
+        // Remove from whitelist and add to blacklist
+        await removeFromWhitelist(jti, req.user.id);
+        await blacklistJwt(jti, parseInt(process.env.JWT_EXPIRES_IN) || 3600);
 
-      logger.info("User logged out", { userId: req.user.id });
+        // Log logout event
+        const AuditLog = mongoose.model("AuditLog");
+        await AuditLog.logAction(req.user.id, "logout", {}, req);
+
+        logger.info("User logged out", { userId: req.user.id });
+      } else {
+        // No bearer token (expired or absent) — the cookie clear above is the
+        // effective action. Allow so users can always sign out.
+        logger.info("Logout without bearer token (cookie cleared)");
+      }
 
       res.status(200).json({
         success: true,
@@ -356,8 +374,11 @@ class UserController {
       const AuditLog = mongoose.model("AuditLog");
       await AuditLog.logAction(userId, "password_changed", {}, req);
 
-      // Generate new tokens
-      const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+      // Generate new tokens bound to the CURRENT (post-change) tokenVersion
+      // and rotate the refresh cookie (M3). user.save() bumped tokenVersion,
+      // so old tokens are already invalid — these must embed the new value.
+      const { accessToken, refreshToken } = generateTokens(user._id, user.role, user.tokenVersion);
+      setRefreshCookie(res, refreshToken);
 
       logger.info("User password changed", { userId });
 

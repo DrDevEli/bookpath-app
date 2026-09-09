@@ -15,8 +15,9 @@ export function Header() {
     setMarketState(m);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // Await server-side cookie clear before reloading (M3).
+    await logout();
     navigate('/');
     window.location.reload(); // Refresh to update UI
   };

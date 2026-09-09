@@ -2,75 +2,115 @@ import redis from "../config/redis.js";
 import User from "../models/User.js";
 import logger from "../config/logger.js";
 
-const LOGIN_ATTEMPT_LIMIT = 5;
-const LOGIN_ATTEMPT_TTL_SECONDS = 86400; // 1 day
+// L1 (Sep 9): failed-login throttling redesigned so an attacker CANNOT lock a
+// victim's account by rotating IPs. Rules:
+//  - Count only REAL failures (wrong password on an existing account).
+//  - Lock the account ONLY when failures come from <= MAX_LOCK_IPS distinct
+//    IPs (same-source brute force). Distributed attempts (many IPs) never
+//    lock the account — per-IP rate limiting handles those.
+//  - Window is 15 minutes (rolling), not "per calendar day" (a day-window
+//    counter meant 5 failures at 00:01 could lock until 00:30 and the key
+//    never reset until midnight — see audit L1).
+
+const FAIL_WINDOW_SECONDS = 15 * 60; // 15 min rolling window
+const ACCOUNT_LOCK_THRESHOLD = 5; // failures within window
+const MAX_LOCK_IPS = 2; // distinct IPs allowed before we refuse to hard-lock
 const ACCOUNT_LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
+// ipAddress may be undefined (non-web callers). Normalize to "unknown" so the
+// distinct-IP math still works.
+function normalizeIp(ip) {
+  return typeof ip === "string" && ip.trim() ? ip.trim() : "unknown";
+}
+
 /**
- * Increment login attempts for the given email.
- * Returns the new attempt count.
+ * Record a failed login for an identifier (email or username).
+ * Returns { locked: boolean, attempts, distinctIps, lockUntil } — the caller
+ * decides the HTTP status (423/429) from `locked`.
  */
-export async function incrementLoginAttempts(email) {
-  const normalizedEmail =
-    typeof email === "string" ? email.trim().toLowerCase() : null;
+export async function recordFailedLogin(identifier, ipAddress) {
+  const normalizedId =
+    typeof identifier === "string" ? identifier.trim().toLowerCase() : null;
+  if (!normalizedId) return { locked: false, attempts: 0, distinctIps: 0 };
 
-  if (!normalizedEmail) {
-    logger.warn("Invalid login identifier for incrementLoginAttempts", { email });
-    return 0;
-  }
-
+  const ip = normalizeIp(ipAddress);
   try {
-    const key = `login:${normalizedEmail}:${new Date().toISOString().slice(0, 10)}`;
-    const attempts = await redis.incr(key);
-    await redis.expire(key, LOGIN_ATTEMPT_TTL_SECONDS);
+    const countKey = `login:fail:${normalizedId}`;
+    const ipsKey = `login:failips:${normalizedId}`;
 
-    // If attempts exceed limit, lock the account
-    if (attempts >= LOGIN_ATTEMPT_LIMIT) {
-      const user = await User.findOne({ email: { $eq: normalizedEmail } });
-      if (user) {
-        await lockUserAccount(user._id);
-        logger.warn("Account locked due to too many failed login attempts", {
-          email: normalizedEmail,
-        });
-      }
+    const attempts = await redis.incr(countKey);
+    await redis.expire(countKey, FAIL_WINDOW_SECONDS);
+    await redis.sadd(ipsKey, ip);
+    await redis.expire(ipsKey, FAIL_WINDOW_SECONDS);
+    const distinctIps = await redis.scard(ipsKey);
+
+    // Same-source brute force → hard-lock the account. If failures spread
+    // across many IPs, that is a distributed attack or a lockout-DoS attempt:
+    // do NOT hard-lock; the per-IP rate limiter is the correct control.
+    if (attempts >= ACCOUNT_LOCK_THRESHOLD && distinctIps <= MAX_LOCK_IPS) {
+      const lockUntil = new Date(Date.now() + ACCOUNT_LOCK_DURATION_MS);
+      await User.updateOne(
+        { email: normalizedId },
+        { accountLockedUntil: lockUntil }
+      );
+      logger.warn("Account locked after repeated failed logins (same source)", {
+        identifier: normalizedId,
+        attempts,
+        distinctIps,
+        lockUntil: lockUntil.toISOString(),
+      });
+      return { locked: true, attempts, distinctIps, lockUntil };
     }
 
-    return attempts;
+    return { locked: false, attempts, distinctIps };
   } catch (error) {
-    logger.error("Error incrementing login attempts", {
-      email: normalizedEmail,
+    logger.error("Error recording failed login", {
+      identifier: normalizedId,
       error: error.message,
     });
-    return 0; // Return 0 to prevent blocking legitimate login attempts if Redis fails
+    return { locked: false, attempts: 0, distinctIps: 0 }; // fail open
   }
 }
 
 /**
- * Clear login attempts for the given email.
+ * Clear failed-login state after a successful authentication.
  */
-export async function clearLoginAttempts(email) {
-  const normalizedEmail =
-    typeof email === "string" ? email.trim().toLowerCase() : null;
-
-  if (!normalizedEmail) {
-    logger.warn("Invalid login identifier for clearLoginAttempts", { email });
-    return;
-  }
-
+export async function clearFailedLogins(identifier) {
+  const normalizedId =
+    typeof identifier === "string" ? identifier.trim().toLowerCase() : null;
+  if (!normalizedId) return;
   try {
-    const key = `login:${normalizedEmail}:${new Date().toISOString().slice(0, 10)}`;
-    await redis.del(key);
-    logger.info("Login attempts cleared", { email: normalizedEmail });
+    await redis.del(`login:fail:${normalizedId}`);
+    await redis.del(`login:failips:${normalizedId}`);
   } catch (error) {
-    logger.error("Error clearing login attempts", {
-      email: normalizedEmail,
+    logger.error("Error clearing failed logins", {
+      identifier: normalizedId,
       error: error.message,
     });
   }
 }
 
+// ---- Back-compat wrappers (older callers) --------------------------------
+
 /**
- * Lock the user account for a defined duration.
+ * @deprecated Use recordFailedLogin(identifier, ipAddress) — the old daily
+ * counter let ANY IP lock a known account (lockout DoS, audit L1).
+ */
+export async function incrementLoginAttempts(identifier, ipAddress) {
+  const r = await recordFailedLogin(identifier, ipAddress);
+  return r.locked ? ACCOUNT_LOCK_THRESHOLD + 1 : r.attempts;
+}
+
+/**
+ * @deprecated Use clearFailedLogins(identifier).
+ */
+export async function clearLoginAttempts(identifier) {
+  return clearFailedLogins(identifier);
+}
+
+/**
+ * Lock the user account for a defined duration. (Retained for explicit
+ * admin/other flows.)
  */
 export async function lockUserAccount(userId) {
   try {

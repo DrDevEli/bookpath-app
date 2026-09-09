@@ -9,10 +9,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '../api';
 
+const PASSWORD_RULE =
+  'Password must be at least 12 characters and contain uppercase, lowercase, numbers and special characters';
+const passwordCheck = z
+  .string()
+  .min(12, PASSWORD_RULE)
+  .max(128, 'Password too long')
+  .regex(/[a-z]/, PASSWORD_RULE)
+  .regex(/[A-Z]/, PASSWORD_RULE)
+  .regex(/[0-9]/, PASSWORD_RULE)
+  .regex(/[^A-Za-z0-9]/, PASSWORD_RULE);
+
 const registerSchema = z.object({
   username: z.string().min(2, 'Username must be at least 2 characters').max(50, 'Username too long'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: passwordCheck,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",

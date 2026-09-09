@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 
 // Layout Components
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
+import { restoreSessionIfNeeded } from './auth';
 
 // Pages
 import { Home } from './pages/Home';
@@ -30,6 +31,12 @@ import { VerifyEmail } from './pages/VerifyEmail';
 import './App.css';
 
 function App() {
+  useEffect(() => {
+    // Session restore (M3): if the short-lived access token expired but a
+    // valid refresh cookie exists, silently mint a new token and reload once.
+    restoreSessionIfNeeded();
+  }, []);
+
   return (
     <BrowserRouter>
       <div className="App flex flex-col min-h-screen relative">

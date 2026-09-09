@@ -3,9 +3,8 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
 import User from "../models/User.js";
 import {
-  incrementLoginAttempts,
-  clearLoginAttempts,
-  lockUserAccount,
+  recordFailedLogin,
+  clearFailedLogins,
   isJwtBlacklisted,
 } from "../utils/authRedisUtils.js";
 
@@ -15,15 +14,16 @@ passport.use(
     {
       usernameField: "email", // Can accept email or username
       passwordField: "password",
+      passReqToCallback: true,
     },
-    async (identifier, password, done) => {
+    async (req, identifier, password, done) => {
       try {
         // Determine if identifier is email or username
         const isEmail = identifier.includes('@');
         const user = await User.findOne(
           isEmail ? { email: identifier.toLowerCase() } : { username: identifier }
         ).select("+password");
-        
+
         if (!user)
           return done(null, false, { message: "Incorrect email/username or password" });
 
@@ -33,23 +33,18 @@ passport.use(
           });
         }
 
-        const attempts = await incrementLoginAttempts(identifier);
-
-        if (attempts >= 5) {
-          const lockUntil = await lockUserAccount(user._id);
-          return done(null, false, {
-            message: `Too many attempts. Account locked until ${lockUntil.toISOString()}`,
-          });
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
+          // Count ONLY real failures with client IP; cross-IP attempts cannot
+          // hard-lock a victim's account (audit L1).
+          await recordFailedLogin(identifier, req.ip);
+          return done(null, false, { message: "Incorrect email/username or password" });
         }
 
-        const isMatch = await user.comparePassword(password);
-        if (!isMatch)
-          return done(null, false, { message: "Incorrect email/username or password" });
-
         // Successful login resets attempts (clear both email and username)
-        await clearLoginAttempts(identifier);
-        await clearLoginAttempts(user.email);
-        await clearLoginAttempts(user.username);
+        await clearFailedLogins(identifier);
+        await clearFailedLogins(user.email);
+        await clearFailedLogins(user.username);
 
         return done(null, user);
       } catch (error) {

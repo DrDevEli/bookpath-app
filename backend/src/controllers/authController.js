@@ -18,6 +18,7 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import { ApiError } from "../utils/errors.js";
 import { generateTokens } from "../utils/jwtUtils.js";
+import { setRefreshCookie, clearRefreshCookie } from "../utils/refreshCookie.js";
 import { isJwtBlacklisted, whitelistJwt } from "../utils/authRedisUtils.js";
 import redis from "../utils/redis.js";
 import logger from "../config/logger.js";
@@ -242,8 +243,12 @@ class AuthController {
       // Generate tokens
       const { accessToken, refreshToken, jti } = generateTokens(
         user._id,
-        user.role
+        user.role,
+        user.tokenVersion
       );
+
+      // Rotate refresh token into httpOnly cookie (M3)
+      setRefreshCookie(res, refreshToken);
 
       // Add to whitelist
       await whitelistJwt(
@@ -295,7 +300,11 @@ class AuthController {
    */
   static async refreshTokens(req, res, next) {
     try {
-      const { refreshToken } = req.body;
+      // Accept the refresh token from the httpOnly cookie (primary, M3) or the
+      // request body (legacy clients).
+      const bodyToken = req.body?.refreshToken;
+      const cookieToken = req.cookies?.[REFRESH_COOKIE_NAME];
+      const refreshToken = typeof bodyToken === "string" && bodyToken ? bodyToken : cookieToken;
 
       if (!refreshToken) {
         throw new ApiError("Refresh token is required", 400);
@@ -327,6 +336,9 @@ class AuthController {
         user.role,
         user.tokenVersion
       );
+
+      // Rotate: persist the NEW refresh token in the cookie.
+      setRefreshCookie(res, newRefreshToken);
 
       // Blacklist old refresh token
       await redis.set(

@@ -379,11 +379,13 @@ router.post(
 // Token refresh route
 router.post("/refresh", AuthController.refreshTokens);
 
-// Logout route (authenticated — blacklists the token's jti). Registered ONCE:
-// a bare duplicate (no authMiddleware) crashed with req.user undefined → 500.
-router.post("/logout", authMiddleware(), UserController.logout);
+// Logout route — intentionally NOT auth-gated (M3): clearing the httpOnly
+// refresh cookie must work even when the access token has expired. The
+// controller blacklists the jti when a valid bearer is present and always
+// clears the cookie.
+router.post("/logout", UserController.logout);
 
-// Logout all sessions
+// Logout all sessions (requires auth — revokes every token via tokenVersion)
 router.post("/logout/all", authMiddleware(), AuthController.logoutAll);
 
 export default router;
