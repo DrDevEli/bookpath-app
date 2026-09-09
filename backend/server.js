@@ -103,9 +103,8 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 // Initialize passport
 app.use(passport.initialize());
 
-// Basic health check route
+// Health check route — minimal payload for monitors; no env/uptime disclosure.
 app.get("/health", async (req, res) => {
-  // Check Redis connection
   let redisStatus = "disconnected";
   try {
     const redis = (await import("./src/config/redis.js")).default;
@@ -116,13 +115,9 @@ app.get("/health", async (req, res) => {
   }
 
   res.status(200).json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    mongodb:
-      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    status: mongoose.connection.readyState === 1 && redisStatus === "connected" ? "ok" : "degraded",
+    mongodb: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     redis: redisStatus,
-    environment: process.env.NODE_ENV,
-    uptime: process.uptime(),
   });
 });
 
@@ -139,16 +134,21 @@ app.use("/api/subscribers", subscriberRoutes);
 // SEO landing pages (server-rendered HTML at crawlable root paths)
 app.use("/", seoRoutes);
 
-// Add Swagger documentation
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    explorer: true,
-    customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "BookPath API Documentation",
-  })
-);
+// Swagger documentation — development only (audit M5: full API surface was
+// publicly exposed on production via /api-docs).
+if (process.env.NODE_ENV !== "production") {
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      explorer: true,
+      customCss: ".swagger-ui .topbar { display: none }",
+      customSiteTitle: "BookPath API Documentation",
+    })
+  );
+} else {
+  app.use("/api-docs", (req, res) => res.status(404).json({ success: false, message: "Not found" }));
+}
 
 // Error handling
 app.use(errorHandler);
