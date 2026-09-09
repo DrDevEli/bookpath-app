@@ -335,16 +335,16 @@ class UserController {
       // Check if new password is the same as current
       if (await user.comparePassword(newPassword)) {
         throw new ApiError(
-          400,
-          "New password must be different from current password"
+          "New password must be different from current password",
+          400
         );
       }
 
       // Check if password has been used before
       if (await user.isPasswordReused(newPassword)) {
         throw new ApiError(
-          400,
-          "Password has been used previously. Please choose a different password."
+          "Password has been used previously. Please choose a different password.",
+          400
         );
       }
 

@@ -101,6 +101,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     select: false,
   },
+  // SHA-256 hashes of one-time recovery codes. High-entropy random codes are
+  // hashed so a DB read can't be used to log in; plaintext is shown to the
+  // user exactly once at setup (audit C2).
+  recoveryCodes: {
+    type: [String],
+    select: false,
+    default: undefined,
+  },
 
   oauth: {
     google: String,
@@ -124,28 +132,29 @@ userSchema.post("save", function (doc) {
 // Hash password before saving
 userSchema.pre("save", async function (next) {
   if (this.isModified("password")) {
-    // Store the old password in history if it exists
     if (this.password) {
+      // Hash the NEW password FIRST. Never store or push plaintext anywhere.
+      const hashed = await bcrypt.hash(this.password, 12);
+
+      // Rolling history of the last 5 password HASHES for reuse detection.
+      // SECURITY: only bcrypt hashes are stored here — plaintext passwords
+      // must never reach the database (see audit C1).
       if (!this.passwordHistory) {
         this.passwordHistory = [];
       }
-
-      // Keep only the last 5 passwords
       if (this.passwordHistory.length >= 5) {
         this.passwordHistory.shift();
       }
+      this.passwordHistory.push({ hash: hashed, changedAt: new Date() });
 
-      this.passwordHistory.push({
-        hash: this.password,
-        changedAt: new Date(),
-      });
+      this.password = hashed;
+
+      // Epoch revocation timestamp. Any JWT that was issued before "now"
+      // embeds an older tokenVersion and is rejected by authMiddleware
+      // (user.tokenVersion > verified.tokenVersion). Monotonic via +1 guard
+      // against same-millisecond revocations.
+      this.tokenVersion = Math.max(Date.now(), (this.tokenVersion || 0) + 1);
     }
-
-    // Hash the new password
-    this.password = await bcrypt.hash(this.password, 12);
-
-    // Increment token version to invalidate existing JWTs
-    this.tokenVersion += 1;
   }
   next();
 });

@@ -13,7 +13,23 @@ const publicResendLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  skipFailedRequests: true, // Don't count failed requests (4xx/5xx)
+  // Count ALL requests (including 4xx/5xx). skipFailedRequests:true let
+  // enumeration probes (which return 404) bypass the limiter — audit H3.
+  skipFailedRequests: false,
+});
+
+// 2FA login limiter — TOTP brute-force protection (audit C2). Keyed by
+// IP + target userId so an attacker can't grind 6-digit codes freely.
+const twoFactorLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${String(req.body?.userId || "anon")}`,
+  message: {
+    success: false,
+    message: "Too many 2FA attempts. Please try again later.",
+  },
 });
 
 // Controllers
@@ -135,11 +151,13 @@ router.post(
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Logout successful
+ *        description: Logout successful
  *       401:
- *         description: Unauthorized
+ *        description: Unauthorized
  */
-router.post("/logout", UserController.logout);
+// NOTE: logout is intentionally NOT registered here. It is registered once,
+// at the bottom of this file, WITH authMiddleware (a bare duplicate crashed
+// with req.user undefined → HTTP 500 — see audit M1).
 
 /**
  * @swagger
@@ -301,7 +319,7 @@ router.post(
   authMiddleware(),
   AuthController.verifyAndEnableTwoFactor
 );
-router.post("/2fa/login", AuthController.verifyTwoFactor);
+router.post("/2fa/login", twoFactorLoginLimiter, AuthController.verifyTwoFactor);
 router.post("/2fa/disable", authMiddleware(), AuthController.disableTwoFactor);
 
 // Password reset routes
@@ -340,7 +358,12 @@ router.post(
         });
       }
 
-      await emailVerificationController.resendVerificationEmail(email.trim());
+      // Uniform envelope for ALL outcomes (sent / not-found / already
+      // verified / rate-limited). Never leak whether an email is registered —
+      // the 404/400 distinctions were an enumeration oracle (audit H3).
+      await emailVerificationController
+        .resendVerificationEmail(email.trim())
+        .catch(() => null);
 
       res.status(200).json({
         success: true,
@@ -356,7 +379,8 @@ router.post(
 // Token refresh route
 router.post("/refresh", AuthController.refreshTokens);
 
-// Logout route
+// Logout route (authenticated — blacklists the token's jti). Registered ONCE:
+// a bare duplicate (no authMiddleware) crashed with req.user undefined → 500.
 router.post("/logout", authMiddleware(), UserController.logout);
 
 // Logout all sessions

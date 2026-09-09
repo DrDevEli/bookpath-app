@@ -3,6 +3,12 @@
 .env.local
 .env.*.local
 
+# Private keys / TLS material (never commit — see audit C1/H3)
+*.pem
+*.key
+*.crt
+backend/src/config/ssl/
+
 # Logs
 logs
 *.log

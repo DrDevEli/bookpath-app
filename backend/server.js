@@ -126,54 +126,6 @@ app.get("/health", async (req, res) => {
   });
 });
 
-// Cache monitoring endpoint
-app.get("/api/chefaodacasa/cache/stats", async (req, res) => {
-  try {
-    const { cache } = await import("./src/utils/cache.js");
-    const stats = cache.stats.get();
-
-    // Calculate hit rate
-    const total = stats.hits + stats.misses;
-    const hitRate = total > 0 ? (stats.hits / total) * 100 : 0;
-
-    res.status(200).json({
-      success: true,
-      data: {
-        ...stats,
-        hitRate: hitRate.toFixed(2) + "%",
-        total,
-        uptime: Math.floor((Date.now() - stats.lastReset) / 1000) + "s",
-      },
-    });
-  } catch (error) {
-    logger.error("Error getting cache stats", { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: "Failed to get cache statistics",
-    });
-  }
-});
-
-// Cache reset endpoint
-app.post("/api/chefaodacasa/cache/reset", async (req, res) => {
-  try {
-    const { cache } = await import("./src/utils/cache.js");
-    const stats = cache.stats.reset();
-
-    res.status(200).json({
-      success: true,
-      message: "Cache statistics reset successfully",
-      data: stats,
-    });
-  } catch (error) {
-    logger.error("Error resetting cache stats", { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: "Failed to reset cache statistics",
-    });
-  }
-});
-
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/books", bookRoutes);

@@ -117,10 +117,17 @@ class AuthController {
         .fill()
         .map(() => crypto.randomBytes(5).toString("hex").toUpperCase());
 
+      // Persist only SHA-256 hashes of the recovery codes. Plaintext codes
+      // were previously never stored (schema had no field) and shown once —
+      // losing the authenticator meant permanent lockout (audit C2).
+      const recoveryCodeHashes = recoveryCodes.map((code) =>
+        crypto.createHash("sha256").update(code).digest("hex")
+      );
+
       // Save secret to user
       await User.findByIdAndUpdate(userId, {
         twoFactorSecret: secret.base32,
-        recoveryCodes,
+        recoveryCodes: recoveryCodeHashes,
       });
 
       // Generate QR code
@@ -304,10 +311,21 @@ class AuthController {
         throw new ApiError("Token revoked", 401);
       }
 
-      // Generate new tokens
+      // Load the live user — validate existence, revocation version, and mint
+      // with the CURRENT role (never trust the stale token claim).
+      const user = await User.findById(decoded.sub);
+      if (!user) {
+        throw new ApiError("User not found", 404);
+      }
+      if (user.tokenVersion > decoded.tokenVersion) {
+        throw new ApiError("Token invalidated", 401);
+      }
+
+      // Generate new tokens with the live user's tokenVersion + role
       const { accessToken, refreshToken: newRefreshToken } = generateTokens(
-        decoded.sub,
-        decoded.role
+        user._id,
+        user.role,
+        user.tokenVersion
       );
 
       // Blacklist old refresh token
@@ -347,9 +365,11 @@ class AuthController {
     try {
       const userId = req.user.id;
 
-      // Update user's tokenVersion to invalidate all tokens
+      // Epoch revocation timestamp: every token issued before NOW embeds an
+      // older tokenVersion and is rejected by authMiddleware. (Not $inc — the
+      // version must be comparable to the Date.now()-based token claim.)
       await User.findByIdAndUpdate(userId, {
-        $inc: { tokenVersion: 1 },
+        tokenVersion: Date.now(),
       });
 
       logger.info("User logged out from all devices", { userId });
@@ -463,9 +483,11 @@ class AuthController {
         throw new ApiError("Invalid password", 401);
       }
 
-      // Disable 2FA
+      // Disable 2FA — $unset so the secret and recovery hashes are truly
+      // removed from the document (setting to undefined was unreliable).
       user.twoFactorEnabled = false;
       user.twoFactorSecret = undefined;
+      user.recoveryCodes = undefined;
       await user.save();
 
       logger.info("Two-factor authentication disabled", { userId });

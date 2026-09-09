@@ -26,8 +26,8 @@ export async function requestPasswordReset(email) {
 
     if (rateLimited) {
       throw new ApiError(
-        429,
-        "Password reset email was sent recently. Please check your inbox or try again later."
+        "Password reset email was sent recently. Please check your inbox or try again later.",
+        429
       );
     }
 
