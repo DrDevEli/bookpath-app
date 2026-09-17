@@ -64,7 +64,14 @@ class AnalyticsController {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit) || 8, 1), 50);
       const trending = await analyticsService.getTrending({ limit });
-      res.json({ success: true, data: trending });
+      // Covers come from stored analytics events, so records written before the
+      // https normalization still hold http:// URLs. The homepage renders these
+      // on an https page (mixed content), so normalize on the way out.
+      const data = (trending || []).map((b) => ({
+        ...b,
+        coverImage: b.coverImage ? String(b.coverImage).replace(/^http:\/\//i, "https://") : b.coverImage,
+      }));
+      res.json({ success: true, data });
     } catch (error) {
       logger.warn("Trending fetch failed", { error: error.message });
       // Trending is a non-critical public surface — degrade gracefully.
