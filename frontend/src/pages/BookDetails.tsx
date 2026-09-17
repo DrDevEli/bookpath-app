@@ -11,7 +11,6 @@ import api from '../api';
 import { isAuthenticated } from '../auth';
 import { EmailDeals } from '../components/EmailDeals';
 import { truncateDescription } from '../lib/truncate';
-import { getMarket } from '../lib/market';
 
 interface Book {
   id: string;
@@ -263,7 +262,8 @@ export function BookDetails() {
       if (source) params.source = source;
       if (context) params.context = context;
       params.variant = getCtaVariant(); // A/B attribution
-      params.market = getMarket(); // storefront toggle (DE/US)
+      // The storefront (amazon.de vs amazon.com) is resolved server-side from
+      // the request — the visitor never chooses it.
       const response = await api.get(`/books/${book.id}/affiliate-click`, { params });
       
       if (response.data.success && response.data.data?.affiliateUrl) {

@@ -1,5 +1,4 @@
 import { searchGoogleBooks } from "./googleBooksService.js";
-import amazonAffiliateService from "./amazonAffiliateService.js";
 import redis from "../config/redis.js";
 import logger from "../config/logger.js";
 
@@ -50,12 +49,17 @@ export function searchParamsForEntry(entry, type) {
 }
 
 export function cacheKeyForEntry(entry, type) {
-  return `seo:${type}:${entry.slug}`;
+  // v2: the cache now stores RAW Google Books results (no affiliate links), so
+  // the storefront can be resolved per request at render time. The version bump
+  // retires the old enriched entries instead of serving stale `.de` links to
+  // visitors who belong on amazon.com.
+  return `seo:v2:${type}:${entry.slug}`;
 }
 
 /**
  * Fetch (or return cached) books for a landing page. Upstream failures are
  * swallowed and return [] so one bad entry never kills a batch job or a page.
+ * Affiliate links are NOT cached — the HTTP controller adds them per request.
  */
 export async function fetchBooksForEntry(entry, type) {
   const cacheKey = cacheKeyForEntry(entry, type);
@@ -76,14 +80,13 @@ export async function fetchBooksForEntry(entry, type) {
       `${type}/${entry.slug}`
     );
     const trimmed = (books || []).slice(0, MAX_BOOKS);
-    const enriched = await amazonAffiliateService.addAffiliateLinksToBooks(trimmed);
 
     try {
-      await redis.set(cacheKey, JSON.stringify(enriched), "EX", CACHE_TTL);
+      await redis.set(cacheKey, JSON.stringify(trimmed), "EX", CACHE_TTL);
     } catch (err) {
       logger.warn("SEO cache write failed", { type, slug: entry.slug, error: err.message });
     }
-    return enriched;
+    return trimmed;
   } catch (err) {
     logger.error("SEO book fetch failed", { type, slug: entry.slug, error: err.message });
     return [];

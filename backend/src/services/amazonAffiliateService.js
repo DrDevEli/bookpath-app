@@ -109,14 +109,18 @@ class AmazonAffiliateService {
   /**
    * Add Amazon affiliate links to an array of books
    * @param {Array} books - Array of book objects
+   * @param {string} [market] - Target storefront ("de" | "us"). Callers that
+   *   render per-visitor (SSR pages, API) must derive it from the request via
+   *   utils/marketResolver so links match the visitor's storefront.
    * @returns {Promise<Array>} Books with amazonLink property added
    */
-  async addAffiliateLinksToBooks(books) {
+  async addAffiliateLinksToBooks(books, market) {
     if (!Array.isArray(books) || books.length === 0) {
       return books;
     }
 
-    if (!this.associateTag) {
+    const resolved = this.getMarket(market);
+    if (!resolved?.tag) {
       logger.debug("Amazon Associates tag not configured, skipping affiliate links");
       // Return books with null amazonLink
       return books.map((book) => ({
@@ -134,10 +138,11 @@ class AmazonAffiliateService {
             return book;
           }
 
-          // Generate affiliate link
+          // Generate affiliate link for the requested storefront
           const amazonLink = await this.generateAffiliateLink({
             title: book.title,
             authors: book.authors || book.authorNames || [],
+            market,
           });
 
           return {

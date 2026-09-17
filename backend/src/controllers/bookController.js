@@ -6,6 +6,7 @@ import amazonAffiliateService from "../services/amazonAffiliateService.js";
 import featuredBooksService from "../services/featuredBooksService.js";
 import analyticsService from "../services/analyticsService.js";
 import { ApiError } from "../utils/errors.js";
+import { resolveMarket } from "../utils/marketResolver.js";
 import redis from "../config/redis.js";
 import logger from "../config/logger.js";
 import Book from "../models/Book.js";
@@ -520,8 +521,12 @@ class BookController {
         throw new ApiError("Book not found. Only Google Books is currently supported.", 404);
       }
       
-      // Generate affiliate link for the requested marketplace (default DE)
-      const { market } = req.query;
+      // Storefront is resolved from the REQUEST (edge country header, then
+      // Accept-Language, then the configured default) — it is deliberately not
+      // a client-chosen parameter: a visitor should never have to pick between
+      // amazon.de and amazon.com, and a query parameter that flips the tag is
+      // nothing but a way to send traffic to the wrong storefront.
+      const market = resolveMarket(req);
       const amazonLink = await amazonAffiliateService.generateAffiliateLink({
         title: book.title,
         authors: book.authors || [],
@@ -545,7 +550,7 @@ class BookController {
         coverImage: book.coverImage || null,
         amazonUrl: amazonLink,
         variant: variant || null,
-        market: market === "us" ? "us" : "de",
+        market,
         userId: req.user?.id || null,
         req,
       });
@@ -555,6 +560,7 @@ class BookController {
         bookTitle: book.title,
         source,
         context: context || null,
+        market,
         timestamp: new Date().toISOString()
       });
 
@@ -562,7 +568,8 @@ class BookController {
         success: true,
         data: {
           affiliateUrl: amazonLink,
-          bookId: id
+          bookId: id,
+          market
         }
       });
     } catch (error) {

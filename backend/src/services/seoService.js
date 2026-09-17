@@ -188,7 +188,8 @@ function booksJson(books, entry, type) {
   };
 }
 
-function faqJson(entry, type, lang) {
+function faqJson(entry, type, lang, market = "de") {
+  const store = market === "us" ? "Amazon.com" : "Amazon.de";
   const q1 =
     lang === "de"
       ? `Welche ${entry.name} lohnen sich am meisten?`
@@ -211,8 +212,8 @@ function faqJson(entry, type, lang) {
       : `Where can I buy these books?`;
   const a3 =
     lang === "de"
-      ? `Jeder Eintrag verlinkt direkt zu einer Suche auf Amazon.de, damit du den Titel schnell und bequem bestellen kannst.`
-      : `Each entry links directly to an Amazon search so you can order the title quickly and easily.`;
+      ? `Jeder Eintrag verlinkt direkt zu einer Suche auf ${store}, damit du den Titel schnell und bequem bestellen kannst.`
+      : `Each entry links directly to an ${store} search so you can order the title quickly and easily.`;
 
   return {
     "@context": "https://schema.org",
@@ -285,7 +286,7 @@ function bookCardHtml(book) {
 // ---------------------------------------------------------------------------
 // Full document render
 // ---------------------------------------------------------------------------
-export function renderLandingPage({ type, entry, books = [] }) {
+export function renderLandingPage({ type, entry, books = [], market = "de" }) {
   const { lang, category, intro, outro } = buildCopy(entry, type);
   const title = `${entry.name}${lang === "de" ? " — Empfehlungen & Bestseller" : " — Recommendations & Bestsellers"} | ${SITE_NAME}`;
   const desc =
@@ -302,7 +303,7 @@ export function renderLandingPage({ type, entry, books = [] }) {
     breadcrumbJson(entry, type),
     itemListJson(books, entry, type),
     booksJson(books, entry, type),
-    faqJson(entry, type, lang),
+    faqJson(entry, type, lang, market),
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -446,9 +447,232 @@ export function renderHub() {
 }
 
 // ---------------------------------------------------------------------------
+// Book detail page (server-rendered for crawlers + social preview bots)
+// ---------------------------------------------------------------------------
+const BOOK_STYLE = `
+    :root { --bg:#f8fafc; --fg:#1e293b; --muted:#64748b; --brand:#3b82f6; --card:#ffffff; --line:#e2e8f0; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--fg); line-height:1.6; }
+    header.site { background:var(--brand); color:#fff; padding:14px 20px; }
+    header.site .wrap { max-width:1080px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
+    header.site a { color:#fff; text-decoration:none; font-weight:600; }
+    header.site .brand { font-size:1.3rem; }
+    nav a { margin-left:14px; opacity:.92; }
+    main { max-width:1080px; margin:0 auto; padding:28px 20px 60px; }
+    .crumbs { font-size:.85rem; color:var(--muted); margin-bottom:16px; }
+    .crumbs a { color:var(--muted); }
+    .head { display:flex; gap:26px; align-items:flex-start; }
+    .cover { flex:0 0 200px; }
+    .cover img { width:200px; height:300px; object-fit:cover; border-radius:8px; background:#eef2f7; box-shadow:0 2px 10px rgba(15,23,42,.12); }
+    .cover .nophoto { width:200px; height:300px; border-radius:8px; background:#eef2f7; display:flex; align-items:center; justify-content:center; color:#94a3b8; }
+    h1 { font-size:1.7rem; margin:0 0 6px; line-height:1.25; }
+    .byline { color:var(--muted); margin:0 0 12px; }
+    .byline a { color:var(--brand); text-decoration:none; }
+    .facts { margin:0 0 16px; padding:0; list-style:none; font-size:.9rem; color:#475569; }
+    .facts li { margin-bottom:4px; }
+    .facts b { color:var(--fg); }
+    .price { font-size:1.15rem; font-weight:700; color:#15803d; margin:0 0 12px; }
+    .price span { font-weight:400; font-size:.8rem; color:var(--muted); }
+    a.cta { display:inline-block; background:#b45309; color:#fff; padding:12px 22px; border-radius:8px; font-weight:600; text-decoration:none; }
+    a.cta.alt { background:var(--brand); margin-left:8px; }
+    section.desc { margin-top:34px; }
+    section.desc h2, section.related h2 { font-size:1.1rem; margin:0 0 10px; }
+    section.desc p { margin:0 0 12px; max-width:820px; color:#334155; white-space:pre-line; }
+    section.related { margin-top:34px; border-top:1px solid var(--line); padding-top:22px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:16px; }
+    .minibook { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; display:flex; gap:12px; }
+    .minibook img { width:64px; height:96px; object-fit:cover; border-radius:5px; background:#eef2f7; }
+    .minibook .t { font-size:.92rem; font-weight:600; margin:0 0 4px; line-height:1.3; }
+    .minibook .a, .minibook .y { margin:0; font-size:.82rem; color:var(--muted); }
+    .minibook a { color:var(--fg); text-decoration:none; }
+    footer { max-width:1080px; margin:0 auto; padding:20px; color:var(--muted); font-size:.85rem; border-top:1px solid var(--line); }
+    footer a { color:var(--muted); }
+    @media (max-width:640px) { .head { flex-direction:column; } .cover, .cover img, .cover .nophoto { width:100%; max-width:240px; height:auto; } }
+`;
+
+function truncateText(str, max = 155) {
+  const clean = String(str || "").replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max - 1).replace(/[\s,;:.-]+$/, "")}…`;
+}
+
+/**
+ * Server-rendered book detail page. Rendered for crawlers and social/link
+ * preview bots (nginx routes only those UAs here — humans keep the React app).
+ * Content mirrors the app page: real title, authors, cover, description and the
+ * Amazon CTA for the visitor's storefront, so it is not cloaking.
+ *
+ * @param {{book: object, related?: object[], market?: string}} params
+ */
+export function renderBookDetail({ book = {}, related = [], market = "de" }) {
+  const id = book.id || "";
+  const title = book.title || "Book";
+  const authors = (book.authors || []).filter(Boolean);
+  const authorLine = authors.length ? authors.join(", ") : "";
+  const canonical = `${SITE_URL}/books/${encodeURIComponent(id)}`;
+  const cover = book.coverImage || "";
+  const desc = String(book.description || "").trim();
+  const metaDesc = truncateText(
+    desc || `${title}${authorLine ? ` by ${authorLine}` : ""} — book details, cover and where to buy.`,
+    155
+  );
+  const pageTitle = authorLine
+    ? `${title} by ${authorLine} — Book details & where to buy | ${SITE_NAME}`
+    : `${title} — Book details & where to buy | ${SITE_NAME}`;
+
+  // Link the author to the matching catalog landing page when we have one.
+  const authorEntry = authors
+    .map((a) => AUTHORS.find((e) => slugify(e.name) === slugify(a)))
+    .find(Boolean);
+
+  const facts = [];
+  if (book.firstPublishYear) facts.push(`<li><b>First published:</b> ${escapeHtml(book.firstPublishYear)}</li>`);
+  if (book.publisher) facts.push(`<li><b>Publisher:</b> ${escapeHtml(book.publisher)}</li>`);
+  if (book.pageCount) facts.push(`<li><b>Pages:</b> ${escapeHtml(book.pageCount)}</li>`);
+  if (book.isbn) facts.push(`<li><b>ISBN:</b> ${escapeHtml(book.isbn)}</li>`);
+  if (book.language) facts.push(`<li><b>Language:</b> ${escapeHtml(String(book.language).toUpperCase())}</li>`);
+
+  const priceHtml =
+    book.price != null
+      ? `<p class="price">${escapeHtml(currencySymbol(book.currencyCode))}${Number(book.price).toFixed(2)} <span>list price</span></p>`
+      : "";
+
+  const cta = book.amazonLink
+    ? `<a class="cta" href="${escapeHtml(book.amazonLink)}" rel="nofollow sponsored noopener noreferrer" target="_blank">Check price on Amazon →</a>`
+    : "";
+  const searchCta = `<a class="cta alt" href="${SITE_URL}/search?q=${encodeURIComponent(title)}">Find similar books</a>`;
+
+  const storeLabel = market === "us" ? "Amazon.com" : "Amazon.de";
+
+  const structured = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Book",
+      name: title,
+      author: authors.map((a) => ({ "@type": "Person", name: a })),
+      image: cover || undefined,
+      isbn: book.isbn || undefined,
+      numberOfPages: book.pageCount || undefined,
+      datePublished: book.firstPublishYear ? String(book.firstPublishYear) : undefined,
+      publisher: book.publisher ? { "@type": "Organization", name: book.publisher } : undefined,
+      inLanguage: book.language || undefined,
+      url: canonical,
+      sameAs: book.canonicalVolumeLink || undefined,
+      description: desc ? truncateText(desc, 400) : undefined,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "Browse", item: `${SITE_URL}/seo` },
+        { "@type": "ListItem", position: 3, name: title, item: canonical },
+      ],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: SITE_NAME,
+      url: SITE_URL,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${SITE_URL}/search?q={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ];
+
+  const relatedHtml = related.length
+    ? `<section class="related">
+    <h2>${authorLine ? `More by ${escapeHtml(authorLine)}` : "Readers also viewed"}</h2>
+    <div class="grid">${related
+      .map(
+        (b) => `
+      <article class="minibook">
+        ${b.coverImage ? `<img src="${escapeHtml(b.coverImage)}" alt="${escapeHtml(b.title)} cover" loading="lazy" width="64" height="96">` : `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="64" height="96">`}
+        <div>
+          <p class="t"><a href="${bookDetailUrl(b.id)}">${escapeHtml(b.title)}</a></p>
+          ${b.authors?.length ? `<p class="a">by ${(b.authors || []).map(escapeHtml).join(", ")}</p>` : ""}
+          ${b.firstPublishYear ? `<p class="y">${escapeHtml(b.firstPublishYear)}</p>` : ""}
+        </div>
+      </article>`
+      )
+      .join("")}</div>
+  </section>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="${book.language === "de" ? "de" : "en"}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(metaDesc)}">
+  <link rel="canonical" href="${canonical}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="book">
+  <meta property="og:site_name" content="${SITE_NAME}">
+  <meta property="og:title" content="${escapeHtml(pageTitle)}">
+  <meta property="og:description" content="${escapeHtml(metaDesc)}">
+  <meta property="og:url" content="${canonical}">
+  ${cover ? `<meta property="og:image" content="${escapeHtml(cover)}">` : ""}
+  ${authorLine ? `<meta property="book:author" content="${escapeHtml(authorLine)}">` : ""}
+  ${book.isbn ? `<meta property="book:isbn" content="${escapeHtml(book.isbn)}">` : ""}
+  <meta name="twitter:card" content="${cover ? "summary_large_image" : "summary"}">
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}">
+  <meta name="twitter:description" content="${escapeHtml(metaDesc)}">
+  ${cover ? `<meta name="twitter:image" content="${escapeHtml(cover)}">` : ""}
+  <style>${BOOK_STYLE}</style>
+  <script type="application/ld+json">${escapeJson(structured)}</script>
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="${SITE_URL}/">${SITE_NAME}</a>
+      <nav>
+        <a href="${SITE_URL}/search">Search</a>
+        <a href="${SITE_URL}/category">Genres</a>
+        <a href="${SITE_URL}/seo">Browse</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <nav class="crumbs"><a href="${SITE_URL}/">Home</a> › <a href="${SITE_URL}/seo">Browse</a> › ${escapeHtml(title)}</nav>
+    <div class="head">
+      <div class="cover">${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(title)} cover" width="200" height="300">` : `<div class="nophoto">No cover</div>`}</div>
+      <div>
+        <h1>${escapeHtml(title)}</h1>
+        <p class="byline">${authorEntry ? `by <a href="${pageUrl("author", authorEntry.slug)}">${escapeHtml(authorLine)}</a>` : authorLine ? `by ${escapeHtml(authorLine)}` : ""}</p>
+        ${facts.length ? `<ul class="facts">${facts.join("")}</ul>` : ""}
+        ${priceHtml}
+        ${cta}${searchCta}
+      </div>
+    </div>
+    ${
+      desc
+        ? `<section class="desc">
+      <h2>About this book</h2>
+      <p>${escapeHtml(truncateText(desc, 1200))}</p>
+    </section>`
+        : ""
+    }
+    ${relatedHtml}
+    <section class="related">
+      <h2>Where to buy</h2>
+      <p>${book.amazonLink ? `This title is available via our affiliate partner ${storeLabel}. Prices and availability are set by the retailer.` : `Look this title up on ${storeLabel} or search BookPath for similar books.`}</p>
+    </section>
+  </main>
+  <footer>
+    © ${new Date().getFullYear()} ${SITE_NAME}. Some links are affiliate links and may earn us a commission. <a href="${SITE_URL}/affiliate-disclosure">Affiliate disclosure</a> · <a href="${SITE_URL}/sitemap.xml">Sitemap</a>
+  </footer>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
 // Sitemap + robots
 // ---------------------------------------------------------------------------
-export function renderSitemapXml() {
+export function renderSitemapXml(bookUrls = []) {
   const urls = [];
   const push = (type, slug, prio) => {
     urls.push(
@@ -459,6 +683,10 @@ export function renderSitemapXml() {
   TOPICS.forEach((t) => push("topic", t.slug, "0.6"));
   AUTHORS.forEach((a) => push("author", a.slug, "0.6"));
 
+  const bookEntries = (bookUrls || [])
+    .map((id) => `  <url><loc>${bookDetailUrl(id)}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>`)
+    .join("\n");
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>${SITE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
@@ -467,7 +695,7 @@ export function renderSitemapXml() {
   <url><loc>${SITE_URL}/privacy</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
   <url><loc>${SITE_URL}/terms</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
   <url><loc>${SITE_URL}/affiliate-disclosure</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
-${urls.join("\n")}
+${urls.join("\n")}${bookEntries ? `\n${bookEntries}` : ""}
 </urlset>`;
 }
 
