@@ -42,7 +42,15 @@ class BookController {
         condition: condition || undefined,
         sort: sort || undefined,
       });
-      await redis.set(cacheKey, JSON.stringify(result), "EX", 3600); // cache 1 hour
+      // Cache ONLY successful, non-empty results. Caching a transient upstream
+      // failure (Google Books 429/timeout -> [] with `errors`) poisons the key for
+      // a full hour: every later identical query returns 0 books from cache
+      // (observed with "harry potter" -> 0 while "Harry Potter" -> 19).
+      if (!result?.errors && (result?.pagination?.totalResults || 0) > 0) {
+        await redis.set(cacheKey, JSON.stringify(result), "EX", 3600); // cache 1 hour
+      } else {
+        logger.warn("Search result not cached (empty or upstream error)", { cacheKey, errors: result?.errors });
+      }
       analyticsService.recordImpression({
         source: "search",
         context,
@@ -418,7 +426,10 @@ class BookController {
         sort: sort || undefined,
       });
 
-      await redis.set(cacheKey, JSON.stringify(result), "EX", 3600); // cache 1 hour
+      // Same rule as /search: never cache empty/errored results (TTL poisoning).
+      if (!result?.errors && (result?.pagination?.totalResults || 0) > 0) {
+        await redis.set(cacheKey, JSON.stringify(result), "EX", 3600); // cache 1 hour
+      }
       analyticsService.recordImpression({
         source: "category",
         context: category,

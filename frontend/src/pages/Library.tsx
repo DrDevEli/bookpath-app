@@ -151,7 +151,7 @@ export function Library() {
 
   const handleEdit = (bookId: string) => {
     const book = books.find(
-      (b) => (b._id || b.bookId) === bookId
+      (b) => b.bookId === bookId
     );
     if (book) {
       setEditingBook(book);
@@ -168,7 +168,7 @@ export function Library() {
 
   const handleSaveEdit = async () => {
     if (!editingBook) return;
-    const bookId = editingBook._id || editingBook.bookId;
+    const bookId = editingBook.bookId;
 
     try {
       setUpdating(true);
@@ -179,11 +179,11 @@ export function Library() {
       if (editingBook.notes !== undefined) payload.notes = editingBook.notes;
       if (editingBook.progress !== undefined) payload.progress = editingBook.progress;
 
-      const response = await api.put(`/library/${bookId}`, payload);
+      const response = await api.put(`/library/books/${bookId}`, payload);
       if (response.data.success) {
         setBooks((prev) =>
           prev.map((b) =>
-            (b._id || b.bookId) === bookId
+            b.bookId === bookId
               ? { ...b, ...payload }
               : b
           )
@@ -211,7 +211,7 @@ export function Library() {
   };
 
   const handleRemove = async (bookId: string) => {
-    const book = books.find((b) => (b._id || b.bookId) === bookId);
+    const book = books.find((b) => b.bookId === bookId);
     const title = book?.title || 'this book';
     const confirmed = window.confirm(
       `Are you sure you want to remove "${title}" from your library?`
@@ -219,12 +219,12 @@ export function Library() {
     if (!confirmed) return;
 
     try {
-      const response = await api.delete(`/library/${bookId}`);
+      const response = await api.delete(`/library/books/${bookId}`);
       if (response.data.success) {
         setBooks((prev) =>
-          prev.filter((b) => (b._id || b.bookId) !== bookId)
+          prev.filter((b) => b.bookId !== bookId)
         );
-        if (editingBook && (editingBook._id || editingBook.bookId) === bookId) {
+        if (editingBook && editingBook.bookId === bookId) {
           setEditingBook(null);
         }
         toast({
@@ -501,10 +501,10 @@ export function Library() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {activeShelfBooks.map((book) => (
             <BookCard
-              key={book._id || book.bookId}
+              key={book.bookId}
               book={{
                 ...book,
-                id: book._id || book.bookId,
+                id: book.bookId,
               }}
               showReadStatus={true}
               showProgress={true}

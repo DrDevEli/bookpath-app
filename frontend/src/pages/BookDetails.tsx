@@ -51,6 +51,12 @@ const addToCollectionSchema = z.object({
 
 type AddToCollectionForm = z.infer<typeof addToCollectionSchema>;
 
+const SHELF_LABELS: Record<string, string> = {
+  wantToRead: 'Want to Read',
+  reading: 'Reading',
+  completed: 'Completed',
+};
+
 // Phase 3: A/B CTA variant. Deterministic per browser (persisted in
 // localStorage) so a visitor always sees the same variant; the chosen variant is
 // sent with the affiliate click and compared via /analytics/clicks-by-variant.
@@ -79,6 +85,9 @@ export function BookDetails() {
   const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [adding, setAdding] = useState(false);
   const [loadingAffiliate, setLoadingAffiliate] = useState(false);
+  const [libraryShelf, setLibraryShelf] = useState<'wantToRead' | 'reading' | 'completed'>('wantToRead');
+  const [addingToLibrary, setAddingToLibrary] = useState(false);
+  const [libraryMsg, setLibraryMsg] = useState<string | null>(null);
   const isLoggedIn = isAuthenticated();
 
   const {
@@ -155,6 +164,36 @@ export function BookDetails() {
         setError(typeof errorMsg === 'string' ? errorMsg : String(errorMsg));
     } finally {
       setAdding(false);
+    }
+  };
+
+  // Add to personal library (backend contract: POST /api/library/books {book:{bookId,title,...}, shelf})
+  const handleAddToLibrary = async () => {
+    if (!book) return;
+    try {
+      setAddingToLibrary(true);
+      setLibraryMsg(null);
+      const response = await api.post('/library/books', {
+        shelf: libraryShelf,
+        book: {
+          bookId: book.id,
+          title: book.title,
+          authors: book.authors || [],
+          coverImage: book.coverImage,
+          description: book.description,
+          firstPublishYear: book.firstPublishYear,
+          isbn: book.isbn,
+          genres: book.subjects || [],
+        },
+      });
+      if (response.data.success) {
+        setLibraryMsg(`Saved to "${SHELF_LABELS[libraryShelf]}" — view it in your Library.`);
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to add book to library';
+      setLibraryMsg(typeof errorMsg === 'string' ? errorMsg : String(errorMsg));
+    } finally {
+      setAddingToLibrary(false);
     }
   };
 
@@ -291,14 +330,36 @@ export function BookDetails() {
           <Link to="/search">← Back to Search</Link>
         </Button>
         {isLoggedIn && (
-          <Button 
-            onClick={() => setShowAddToCollection(true)}
-            className="bg-gradient-to-r from-primary to-teal text-white"
-          >
-            Add to Collection
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button 
+              onClick={() => setShowAddToCollection(true)}
+              className="bg-gradient-to-r from-primary to-teal text-white"
+            >
+              Add to Collection
+            </Button>
+            <select
+              value={libraryShelf}
+              onChange={(e) => setLibraryShelf(e.target.value as 'wantToRead' | 'reading' | 'completed')}
+              aria-label="Choose library shelf"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="wantToRead">Want to Read</option>
+              <option value="reading">Reading</option>
+              <option value="completed">Completed</option>
+            </select>
+            <Button variant="outline" onClick={handleAddToLibrary} disabled={addingToLibrary}>
+              {addingToLibrary ? 'Adding...' : 'Add to Library'}
+            </Button>
+          </div>
         )}
       </div>
+
+      {/* Library feedback */}
+      {libraryMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+          <p className="text-emerald-700 text-sm">{libraryMsg}</p>
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (

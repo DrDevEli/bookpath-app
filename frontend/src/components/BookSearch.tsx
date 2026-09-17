@@ -67,7 +67,6 @@ export function BookSearch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<string>('');
-  const [condition, setCondition] = useState<string>(''); // '', 'new', 'used'
   const [sort, setSort] = useState<string>(''); // '', 'newest', 'author_az'
   const [collections, setCollections] = useState<Collection[]>([]);
   const [showAddToCollection, setShowAddToCollection] = useState<string | null>(null);
@@ -149,7 +148,6 @@ export function BookSearch() {
       if (data.title) params.append('title', data.title);
       if (data.author) params.append('author', data.author);
       if (category) params.append('category', category);
-      if (condition) params.append('condition', condition);
       if (sort) params.append('sort', sort);
 
       const response = await api.get(`/books/search?${params.toString()}`);
@@ -205,7 +203,6 @@ export function BookSearch() {
       if (lastSearchTitle) params.append('title', lastSearchTitle);
       if (lastSearchAuthor) params.append('author', lastSearchAuthor);
       if (category) params.append('category', category);
-      if (condition) params.append('condition', condition);
       if (sort) params.append('sort', sort);
       params.append('page', page.toString());
       
@@ -335,7 +332,7 @@ export function BookSearch() {
               )}
             </div>
             {/* Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="category" className="text-text-primary">Category</Label>
                 <select
@@ -356,19 +353,6 @@ export function BookSearch() {
                   <option value="Self-Help">Self-Help</option>
                   <option value="Business">Business</option>
                   <option value="Tech">Tech</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="condition" className="text-text-primary">Condition</Label>
-                <select
-                  id="condition"
-                  value={condition}
-                  onChange={(e) => setCondition(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-white"
-                >
-                  <option value="">Any</option>
-                  <option value="new">New</option>
-                  <option value="used">Used</option>
                 </select>
               </div>
               <div>

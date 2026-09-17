@@ -83,6 +83,9 @@ api.interceptors.response.use(
 );
 
 // Library APIs
+// NOTE: the backend identifies library books by their Google volume id
+// (`book.bookId`, e.g. "google-XXXX"), NOT by the Mongo _id. Paths are
+// /library/books/* — see backend/src/routes/libraryRoutes.js.
 export const libraryAPI = {
   getLibrary: () => api.get('/library'),
   addBook: (book: any, shelf: string) => api.post('/library/books', { book, shelf }),
