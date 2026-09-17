@@ -52,6 +52,17 @@ export class InternalServerError extends ApiError {
 }
 
 export const errorHandler = (err, req, res, _next) => {
+  // Mongoose CastError = a path/query value that cannot be cast to the expected
+  // type, e.g. /api/collections/undefined or /api/collections/not-an-id. That is
+  // a client error; without this it surfaced as a 500 "Something went wrong",
+  // which both hides the real cause and lets anyone generate error noise.
+  if (err.name === "CastError") {
+    err.statusCode = 400;
+    err.status = "fail";
+    err.isOperational = true;
+    err.message = `Invalid ${err.path || "identifier"}`;
+  }
+
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 

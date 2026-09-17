@@ -456,7 +456,11 @@ class CollectionController {
       const collection = await BookCollection.findOne({
         shareableLink,
         isPublic: true,
-      }).populate('user', 'username email');
+      })
+        // PUBLIC endpoint: expose the owner's display name only. Populating
+        // 'email' here leaked the owner's address to anyone holding the share
+        // link (i.e. to everyone, once it is posted anywhere).
+        .populate('user', 'username');
 
       if (!collection) {
         throw new ApiError("Shared collection not found or not public", 404);

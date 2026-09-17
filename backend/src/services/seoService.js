@@ -37,6 +37,14 @@ function escapeJson(value) {
   return JSON.stringify(value ?? null).replace(/</g, "\\u003c");
 }
 
+// Google Books image URLs come back as http:// — an https page loading them is
+// mixed content (blocked or auto-upgraded by browsers, rejected by social
+// scrapers). New fetches are normalized upstream, but cached payloads can still
+// hold http URLs, so normalize again at render time.
+function httpsify(url) {
+  return url ? String(url).replace(/^http:\/\//i, "https://") : url;
+}
+
 // Deterministic pseudo-hash (djb2) so each page's copy is stable + unique.
 function hashString(str) {
   let h = 5381;
@@ -177,7 +185,7 @@ function booksJson(books, entry, type) {
       "@type": "Book",
       name: b.title,
       author: (b.authors || []).map((a) => ({ "@type": "Person", name: a })),
-      image: b.coverImage || undefined,
+      image: b.coverImage ? httpsify(b.coverImage) : undefined,
       isbn: b.isbn || undefined,
       datePublished: b.firstPublishYear ? String(b.firstPublishYear) : undefined,
       url: bookDetailUrl(b.id),
@@ -253,7 +261,7 @@ function relatedPages(entry, type, limit = 8) {
 // Book card HTML
 // ---------------------------------------------------------------------------
 function bookCardHtml(book) {
-  const cover = book.coverImage ? escapeHtml(book.coverImage) : "";
+  const cover = book.coverImage ? escapeHtml(httpsify(book.coverImage)) : "";
   const title = escapeHtml(book.title);
   const authors = (book.authors || []).map(escapeHtml).join(", ");
   const desc = book.description ? escapeHtml(book.description).slice(0, 240) : "";
@@ -421,6 +429,39 @@ export function renderHub() {
     return `<h2>${title}</h2><ul>${links}</ul>`;
   };
 
+  // JSON-LD: the hub is a CollectionPage listing every landing page. It was the
+  // one server-rendered page without structured data.
+  const hubStructured = [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: `Browse Books by Genre, Topic & Author | ${SITE_NAME}`,
+      url: `${SITE_URL}/seo`,
+      isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: GENRES.length + TOPICS.length + AUTHORS.length,
+        itemListElement: [...GENRES, ...TOPICS, ...AUTHORS].map((e, i) => {
+          const t = GENRE_BY_SLUG[e.slug] ? "genre" : TOPIC_BY_SLUG[e.slug] ? "topic" : "author";
+          return {
+            "@type": "ListItem",
+            position: i + 1,
+            name: e.name,
+            url: pageUrl(t, e.slug),
+          };
+        }),
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "Browse", item: `${SITE_URL}/seo` },
+      ],
+    },
+  ];
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -430,6 +471,7 @@ export function renderHub() {
   <meta name="description" content="Browse curated book recommendations by genre, topic and author on ${SITE_NAME}.">
   <link rel="canonical" href="${SITE_URL}/seo">
   <meta name="robots" content="index, follow">
+  <script type="application/ld+json">${escapeJson(hubStructured)}</script>
   <style>body{font-family:system-ui,sans-serif;margin:0;background:#f8fafc;color:#1e293b;line-height:1.6}header{background:#3b82f6;color:#fff;padding:14px 20px}main{max-width:1080px;margin:0 auto;padding:28px 20px}h1{font-size:1.8rem}h2{font-size:1.2rem;margin:24px 0 8px}ul{columns:3;list-style:none;padding:0}a{color:#2563eb;text-decoration:none}@media(max-width:600px){ul{columns:2}}</style>
 </head>
 <body>
@@ -510,7 +552,7 @@ export function renderBookDetail({ book = {}, related = [], market = "de" }) {
   const authors = (book.authors || []).filter(Boolean);
   const authorLine = authors.length ? authors.join(", ") : "";
   const canonical = `${SITE_URL}/books/${encodeURIComponent(id)}`;
-  const cover = book.coverImage || "";
+  const cover = httpsify(book.coverImage) || "";
   const desc = String(book.description || "").trim();
   const metaDesc = truncateText(
     desc || `${title}${authorLine ? ` by ${authorLine}` : ""} — book details, cover and where to buy.`,
@@ -589,7 +631,7 @@ export function renderBookDetail({ book = {}, related = [], market = "de" }) {
       .map(
         (b) => `
       <article class="minibook">
-        ${b.coverImage ? `<img src="${escapeHtml(b.coverImage)}" alt="${escapeHtml(b.title)} cover" loading="lazy" width="64" height="96">` : `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="64" height="96">`}
+        ${b.coverImage ? `<img src="${escapeHtml(httpsify(b.coverImage))}" alt="${escapeHtml(b.title)} cover" loading="lazy" width="64" height="96">` : `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="64" height="96">`}
         <div>
           <p class="t"><a href="${bookDetailUrl(b.id)}">${escapeHtml(b.title)}</a></p>
           ${b.authors?.length ? `<p class="a">by ${(b.authors || []).map(escapeHtml).join(", ")}</p>` : ""}

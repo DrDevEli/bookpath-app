@@ -269,7 +269,11 @@ function transformGoogleBook(item) {
   )?.identifier;
   const isbn = isbn13 || isbn10 || null;
 
-  // Extract cover image
+  // Extract cover image.
+  // Google returns `http://books.google.com/...` URLs; an https page loading an
+  // http image is mixed content (browsers block or upgrade it, and social
+  // scrapers reject it), so normalize the scheme at the source — this feeds the
+  // SPA cards, the SSR landing pages and og:image alike.
   let coverImage = null;
   if (volumeInfo.imageLinks) {
     // Prefer large image, fallback to medium, then small
@@ -279,6 +283,9 @@ function transformGoogleBook(item) {
       volumeInfo.imageLinks.small ||
       volumeInfo.imageLinks.thumbnail ||
       null;
+  }
+  if (coverImage) {
+    coverImage = String(coverImage).replace(/^http:\/\//i, "https://");
   }
 
   // Extract publish year
