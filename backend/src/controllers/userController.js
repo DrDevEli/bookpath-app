@@ -377,8 +377,12 @@ class UserController {
       // Generate new tokens bound to the CURRENT (post-change) tokenVersion
       // and rotate the refresh cookie (M3). user.save() bumped tokenVersion,
       // so old tokens are already invalid — these must embed the new value.
-      const { accessToken, refreshToken } = generateTokens(user._id, user.role, user.tokenVersion);
-      setRefreshCookie(res, refreshToken);
+      // NOTE: generateTokens is ASYNC — the missing await meant no tokens were
+      // returned, so the client kept a revoked token and was logged out.
+      const { accessToken, refreshToken } = await generateTokens(user._id, user.role, user.tokenVersion);
+      if (refreshToken) {
+        setRefreshCookie(res, refreshToken);
+      }
 
       logger.info("User password changed", { userId });
 

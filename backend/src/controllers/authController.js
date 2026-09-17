@@ -18,7 +18,7 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import { ApiError } from "../utils/errors.js";
 import { generateTokens } from "../utils/jwtUtils.js";
-import { setRefreshCookie, clearRefreshCookie } from "../utils/refreshCookie.js";
+import { setRefreshCookie, clearRefreshCookie, REFRESH_COOKIE_NAME } from "../utils/refreshCookie.js";
 import { isJwtBlacklisted, whitelistJwt } from "../utils/authRedisUtils.js";
 import redis from "../utils/redis.js";
 import logger from "../config/logger.js";
@@ -241,7 +241,7 @@ class AuthController {
       }
 
       // Generate tokens
-      const { accessToken, refreshToken, jti } = generateTokens(
+      const { accessToken, refreshToken, jti } = await generateTokens(
         user._id,
         user.role,
         user.tokenVersion
@@ -331,14 +331,19 @@ class AuthController {
       }
 
       // Generate new tokens with the live user's tokenVersion + role
-      const { accessToken, refreshToken: newRefreshToken } = generateTokens(
+      // NOTE: generateTokens is ASYNC — a missing await here silently destructured
+      // a Promise, so /auth/refresh returned {success:true} with NO tokens and the
+      // frontend's silent refresh always failed (users logged out mid-session).
+      const { accessToken, refreshToken: newRefreshToken } = await generateTokens(
         user._id,
         user.role,
         user.tokenVersion
       );
 
       // Rotate: persist the NEW refresh token in the cookie.
-      setRefreshCookie(res, newRefreshToken);
+      if (newRefreshToken) {
+        setRefreshCookie(res, newRefreshToken);
+      }
 
       // Blacklist old refresh token
       await redis.set(

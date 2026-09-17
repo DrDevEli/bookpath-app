@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { login } from '../auth';
+import { loginWithResult, verifyTwoFactorLogin } from '../auth';
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Email or username is required'),
@@ -22,6 +22,11 @@ export function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  // Second step: an account with 2FA enabled gets { requiresTwoFactor, userId }
+  // instead of tokens, so we must collect a TOTP code before we can sign in.
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+  const [rememberedEmail, setRememberedEmail] = useState('');
   
   const {
     register,
@@ -35,13 +40,16 @@ export function Login() {
     try {
       setIsSubmitting(true);
       setError(null);
-      
-      const success = await login(data.email, data.password);
-      
-      if (success) {
+
+      const outcome = await loginWithResult(data.email, data.password);
+
+      if (outcome.status === 'ok') {
         // Redirect to the page they were trying to access, or home
         const from = location.state?.from?.pathname || '/';
         navigate(from, { replace: true });
+      } else if (outcome.status === 'twoFactor') {
+        setPendingUserId(outcome.userId);
+        setRememberedEmail(data.email);
       } else {
         setError('Invalid email or password');
       }
@@ -53,6 +61,80 @@ export function Login() {
       setIsSubmitting(false);
     }
   };
+
+  const onVerifyTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingUserId) return;
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      const ok = await verifyTwoFactorLogin(pendingUserId, totpCode.trim());
+      if (ok) {
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      } else {
+        setError('Invalid or expired verification code');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Verification failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (pendingUserId) {
+    return (
+      <div className="container max-w-md mx-auto py-8">
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">Two-Factor Verification</CardTitle>
+            <CardDescription className="text-center" style={{ color: '#dbcd90' }}>
+              Enter the 6-digit code from your authenticator app
+              {rememberedEmail ? ` for ${rememberedEmail}` : ''}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onVerifyTwoFactor} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="totp" style={{ color: '#dbcd90' }}>Verification Code</Label>
+                <Input
+                  id="totp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value)}
+                  disabled={isSubmitting}
+                  style={{ height: '40px', fontSize: '18px', letterSpacing: '4px', textAlign: 'center' }}
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground" style={{ color: '#dbcd90' }}>
+                  Lost your device? Enter one of your saved recovery codes instead.
+                </p>
+              </div>
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{String(error)}</p>
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={isSubmitting || !totpCode.trim()}>
+                {isSubmitting ? 'Verifying...' : 'Verify & Sign In'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => { setPendingUserId(null); setTotpCode(''); setError(null); }}
+              >
+                Back to login
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-md mx-auto py-8">

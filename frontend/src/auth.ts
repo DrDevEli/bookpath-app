@@ -10,15 +10,51 @@ const SESSION_MARKER_KEY = 'bp_session';
 
 let bootRestoreAttempted = false;
 
-export const login = async (email: string, password: string) => {
+export type LoginOutcome =
+  | { status: 'ok' }
+  | { status: 'twoFactor'; userId: string }
+  | { status: 'failed' };
+
+/**
+ * Login that distinguishes "password OK but 2FA code required" from a real
+ * failure. The backend answers a 2FA-enabled account with
+ * { requiresTwoFactor: true, userId } and NO tokens — treating that as a plain
+ * failure locked those users out of the app entirely.
+ */
+export const loginWithResult = async (email: string, password: string): Promise<LoginOutcome> => {
   try {
     const response = await api.post('/auth/login', { email, password });
-    const { accessToken } = response.data;
+    const { accessToken, requiresTwoFactor, userId } = response.data;
 
+    if (requiresTwoFactor && userId) {
+      return { status: 'twoFactor', userId: String(userId) };
+    }
     if (!accessToken) {
-      return false;
+      return { status: 'failed' };
     }
 
+    localStorage.setItem(TOKEN_KEY, accessToken);
+    localStorage.setItem(SESSION_MARKER_KEY, '1');
+    return { status: 'ok' };
+  } catch {
+    return { status: 'failed' };
+  }
+};
+
+export const login = async (email: string, password: string) => {
+  const outcome = await loginWithResult(email, password);
+  return outcome.status === 'ok';
+};
+
+/**
+ * Second step of a 2FA login: exchange the pending userId + authenticator code
+ * for a real access token.
+ */
+export const verifyTwoFactorLogin = async (userId: string, code: string): Promise<boolean> => {
+  try {
+    const response = await api.post('/auth/2fa/login', { userId, token: code });
+    const { accessToken } = response.data;
+    if (!accessToken) return false;
     localStorage.setItem(TOKEN_KEY, accessToken);
     localStorage.setItem(SESSION_MARKER_KEY, '1');
     return true;

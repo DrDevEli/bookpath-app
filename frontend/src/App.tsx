@@ -25,6 +25,8 @@ import { Terms } from './pages/Terms';
 import { AffiliateDisclosure } from './pages/AffiliateDisclosure';
 import { NotFound } from './pages/NotFound';
 import { Profile } from './pages/Profile';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { VerifyEmail } from './pages/VerifyEmail';
 
 // Styles
@@ -58,6 +60,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="/register" element={<Register />} />
             <Route path="/search" element={<BookSearch />} />
             <Route path="/books/:id" element={<BookDetails />} />
