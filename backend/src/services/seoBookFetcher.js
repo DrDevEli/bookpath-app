@@ -7,7 +7,11 @@ import logger from "../config/logger.js";
  * cache-warming refresh script so they write to the SAME cache keys.
  */
 
-const CACHE_TTL = 24 * 60 * 60; // 24h
+const CACHE_TTL = 72 * 60 * 60; // 72h — must outlive the daily SEO refresh (08:30 UTC)
+// by a wide margin. At 24h the cache expired at almost exactly the moment the next
+// refresh ran, so a single late or quota-blocked refresh left every uncached landing
+// page serving ZERO books (observed 2026-09-26: 31 warm / 123 cold of 154). With 72h a
+// failed refresh degrades freshness only, never availability.
 const MAX_BOOKS = 12;
 
 // Google Books enforces roughly 100 requests / 100 seconds per user on top of
