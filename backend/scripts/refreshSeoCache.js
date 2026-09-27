@@ -148,7 +148,10 @@ function reportAudit(audit, { requireFresh = true } = {}) {
       `OK: 0 cold. ${stale.length} pages hold a payload from an earlier run — normal between daily warms.`
     );
   } else {
-    console.log(`OK: all ${audit.length} pages in scope hold a freshly written payload.`);
+    console.log(
+      `OK: all ${audit.length} pages in scope hold a fresh payload ` +
+        `(${requireFresh ? "written by this run" : "written or TTL re-armed"}).`
+    );
   }
   return { fresh, stale, cold };
 }
