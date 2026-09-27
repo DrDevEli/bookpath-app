@@ -32,7 +32,10 @@
  *      SEO_REFRESH_INTERVAL_MS (default 1100) — minimum gap between Google
  *      Books requests. Google allows ~100 requests / 100 seconds per user, so
  *      firing all 154 pages at once 429s near the end and leaves those landing
- *      pages empty. The gap is what makes the warm actually complete.
+ *      pages empty. The gap is what makes the warm actually complete. It is now
+ *      enforced INSIDE seoBookFetcher.paceRequests() (shared across concurrent
+ *      workers) rather than here, because one page can cost up to 3 requests —
+ *      a per-page gate could no longer bound the real request rate.
  */
 import "./loadEnv.js"; // MUST be first — loads backend/.env before other modules read process.env
 
@@ -41,7 +44,6 @@ import { fetchBooksForEntry, cacheKeyForEntry, CACHE_TTL } from "../src/services
 import redis from "../src/config/redis.js";
 
 const CONCURRENCY = Number(process.env.SEO_REFRESH_CONCURRENCY || 3);
-const INTERVAL_MS = Number(process.env.SEO_REFRESH_INTERVAL_MS || 1100);
 
 // How close to a full TTL a key must be to count as "written by this run". The run
 // itself takes ~170s (up to ~12 min when Google is throttling), so 20 min of slack
@@ -49,15 +51,7 @@ const INTERVAL_MS = Number(process.env.SEO_REFRESH_INTERVAL_MS || 1100);
 // daily run from the next — which is the difference we are detecting.
 const FRESH_WINDOW_SECONDS = 20 * 60;
 
-// Shared request gate: guarantees a minimum gap between Google Books calls even
-// though several workers run concurrently.
-let nextSlot = Date.now();
-async function pace() {
-  const now = Date.now();
-  const wait = Math.max(0, nextSlot - now);
-  nextSlot = Math.max(now, nextSlot) + INTERVAL_MS;
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-}
+// Shared request gate now lives in seoBookFetcher.paceRequests() — see the header.
 
 function buildList(filterType) {
   const list = [];
@@ -195,7 +189,6 @@ async function main() {
     while (cursor < items.length) {
       const i = cursor++;
       const { entry, type } = items[i];
-      await pace();
       const books = await fetchBooksForEntry(entry, type, { force: refetchAll });
       if (refetchAll) refetched++;
       if (books.length > 0) populated++;

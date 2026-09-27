@@ -1,4 +1,5 @@
 import { searchGoogleBooks } from "./googleBooksService.js";
+import { rankBooks, selectionOptionsFor } from "./catalogRanker.js";
 import redis from "../config/redis.js";
 import logger from "../config/logger.js";
 
@@ -6,7 +7,7 @@ import logger from "../config/logger.js";
  * Shared SEO book fetcher — used by both the HTTP controller and the
  * cache-warming refresh script so they write to the SAME cache keys.
  *
- * Two invariants this file exists to protect (learned the hard way, 2026-09-26):
+ * Invariants this file exists to protect:
  *
  *   1. NEVER cache an empty payload. A stored `[]` is a truthy string to
  *      `redis.get`, so an upstream hiccup would be served as a "cache hit" with
@@ -19,6 +20,15 @@ import logger from "../config/logger.js";
  *      and be serving zero books by the afternoon. `force` is how the daily warm
  *      guarantees a write; the sliding TTL on an ordinary read is how normal
  *      crawler traffic keeps an entry alive between runs.
+ *
+ *   3. NEVER serve the raw Google relevance order (2026-09-27). See
+ *      catalogRanker.js for the audit. Two things happen here that did not
+ *      before: the candidate pool is widened by paginating, and every candidate
+ *      is scored/filtered on metadata already in the payload (zero extra quota).
+ *      Google's own relevance order is what filled `topic/best-memoirs` with
+ *      1881 geological surveys, so it is an input, never the output.
+ *      Measured: `maxResults=40` is silently CAPPED AT 20 by the Books API, so a
+ *      bigger pool needs `startIndex` pagination, not a bigger page size.
  */
 
 export const CACHE_TTL = 72 * 60 * 60; // 72h — must outlive the daily SEO refresh (08:30 UTC)
@@ -40,6 +50,30 @@ const STALE_GRACE_SECONDS = 6 * 60 * 60;
 // landing pages with NO books (thin content for crawlers). Back off and retry
 // instead of dropping the page.
 const RETRY_DELAYS_MS = [1500, 4000, 10000];
+
+// How many Google pages (20 volumes each) to pull before ranking. The pool has to
+// be wider than the number of cards we serve, because a page whose top 20 volumes
+// are all 19th-century scans (`topic/best-memoirs`: 12 of 12 rejected) can only be
+// filled from deeper in the result set. Measured: paginating returns disjoint
+// batches (0 id overlap between pages 1/2/3), so each extra page is genuinely new
+// candidates. The loop stops as soon as the ranker can fill the shelf.
+const MAX_CANDIDATE_PAGES = 3;
+
+// Minimum gap between Google Books requests, shared across concurrent callers.
+// Google allows ~100 requests / 100 seconds per user, so a warm that fires all
+// 154 pages at once 429s from ~request 150 onward and leaves those pages empty.
+// This gate used to live in refreshSeoCache.js; it moved here because the
+// fetch now may issue up to MAX_CANDIDATE_PAGES requests for a single page, and a
+// per-page gate could no longer bound the real request rate.
+const REQUEST_INTERVAL_MS = Number(process.env.SEO_REFRESH_INTERVAL_MS || 1100);
+let nextRequestSlot = Date.now();
+
+export async function paceRequests() {
+  const now = Date.now();
+  const wait = Math.max(0, nextRequestSlot - now);
+  nextRequestSlot = Math.max(now, nextRequestSlot) + REQUEST_INTERVAL_MS;
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
 
 function isRateLimited(err) {
   return err?.statusCode === 429 || /rate limit|quota|429/i.test(err?.message || "");
@@ -66,10 +100,10 @@ async function searchWithBackoff(params, label) {
   throw lastErr;
 }
 
-export function searchParamsForEntry(entry, type) {
-  if (type === "genre") return { subject: entry.query, page: 1 };
-  if (type === "author") return { author: entry.query, page: 1 };
-  return { q: entry.query, page: 1 };
+export function searchParamsForEntry(entry, type, page = 1) {
+  if (type === "genre") return { subject: entry.query, page };
+  if (type === "author") return { author: entry.query, page };
+  return { q: entry.query, page };
 }
 
 export function cacheKeyForEntry(entry, type) {
@@ -121,27 +155,54 @@ export async function fetchBooksForEntry(entry, type, options = {}) {
   }
 
   try {
-    const books = await searchWithBackoff(
-      searchParamsForEntry(entry, type),
-      `${type}/${entry.slug}`
-    );
-    const trimmed = (books || []).slice(0, MAX_BOOKS);
+    const selection = selectionOptionsFor(entry, type, MAX_BOOKS);
+    const candidates = [];
+    let ranked = { selected: [], stats: null };
+    let requests = 0;
 
-    if (trimmed.length === 0) {
+    // Widen the candidate pool until the ranker can fill a shelf (or we run out
+    // of pages). Ranking runs over ALL candidates seen so far, so a good book on
+    // page 3 outranks a mediocre one on page 1.
+    for (let page = 1; page <= MAX_CANDIDATE_PAGES; page++) {
+      await paceRequests();
+      const batch = await searchWithBackoff(
+        searchParamsForEntry(entry, type, page),
+        `${type}/${entry.slug} p${page}`
+      );
+      requests++;
+      if (!batch || batch.length === 0) break;
+      candidates.push(...batch);
+      ranked = rankBooks(candidates, selection);
+      if (ranked.selected.length >= MAX_BOOKS) break;
+    }
+
+    const selected = ranked.selected;
+    logger.info("SEO book selection", {
+      type,
+      slug: entry.slug,
+      requests,
+      candidates: candidates.length,
+      served: selected.length,
+      rejected: ranked.stats?.rejected,
+    });
+
+    if (selected.length === 0) {
       // Never cache emptiness — see invariant 1. Leave any existing entry as-is.
-      logger.warn("SEO book fetch returned nothing — cache left untouched", {
+      logger.warn("SEO book fetch returned nothing usable — cache left untouched", {
         type,
         slug: entry.slug,
+        considered: candidates.length,
+        rejected: ranked.stats?.rejected,
       });
       return [];
     }
 
     try {
-      await redis.set(cacheKey, JSON.stringify(trimmed), "EX", CACHE_TTL);
+      await redis.set(cacheKey, JSON.stringify(selected), "EX", CACHE_TTL);
     } catch (err) {
       logger.warn("SEO cache write failed", { type, slug: entry.slug, error: err.message });
     }
-    return trimmed;
+    return selected;
   } catch (err) {
     logger.error("SEO book fetch failed", { type, slug: entry.slug, error: err.message });
 
