@@ -215,6 +215,12 @@ async function main() {
   if (emptySlugs.length) {
     console.log(`Empty pages (Google Books returned nothing): ${emptySlugs.join(", ")}`);
   }
+  if (!refetchAll) {
+    console.log(
+      "NOTE: cache mode — hits were returned with their TTL re-armed, so 'fresh' below means " +
+        "'guaranteed for another 72h', NOT 'content re-fetched'. Use --force for a real content refresh."
+    );
+  }
 
   // --- R5: the authoritative check. Verify the ARTIFACT (a freshly written,
   // --- non-empty payload per page), not the counter printed above.
