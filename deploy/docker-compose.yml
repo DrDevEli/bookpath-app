@@ -4,11 +4,20 @@
 # loopback (never publicly). Do NOT add `--bind_ip`/`--bind 127.0.0.1` inside the
 # container — that binds to the *container's* loopback, which Docker's
 # port-forward (targeting the container's eth0) cannot reach.
+#
+# AUTH (2026-09-29, R4): mongod runs with `--auth` and redis with `--requirepass`.
+# Users were created while auth was still OFF, so they already live in the data
+# dir; credentials are in /root/bp-datastore-credentials-*.txt on the VPS and
+# mirrored into backend/.env (MONGODB_URI + REDIS_PASSWORD).
+#
+# REDIS_PASSWORD is read from deploy/.env (mode 600, gitignored) — it must NEVER
+# be committed: this repo is public. `:?` aborts the compose run when it is unset.
 services:
   mongo:
     image: mongo:7
     container_name: bookpath-mongo
     restart: unless-stopped
+    command: ["mongod", "--auth"]
     ports:
       - "127.0.0.1:27017:27017"
     volumes:
@@ -18,7 +27,7 @@ services:
     image: redis:7-alpine
     container_name: bookpath-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env}"]
     ports:
       - "127.0.0.1:6379:6379"
     volumes:

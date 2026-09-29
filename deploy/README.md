@@ -48,6 +48,40 @@ cd /opt/bookpath/deploy 2>/dev/null || { git clone https://github.com/DrDevEli/b
    (run after DNS propagates).
 4. **Indexing:** submit `https://bookpath.org/sitemap.xml` in Google Search Console.
 
+## Datastore auth (live since 2026-09-29)
+
+Mongo and Redis both require credentials now (`mongod --auth`, `redis-server
+--requirepass`). On an EXISTING datastore, create the users while auth is still
+OFF — `MONGO_INITDB_ROOT_USERNAME` is ignored for a non-empty data dir, so the
+`--auth` flag plus pre-created users is the only way in:
+
+```bash
+# 1. users (auth still off)
+docker exec bookpath-mongo mongosh --quiet --eval "
+db.getSiblingDB('admin').createUser({user:'bpadmin', pwd:'<ADMIN_PW>', roles:[{role:'root',db:'admin'}]});
+db.getSiblingDB('bookpath').createUser({user:'bpapp', pwd:'<APP_PW>', roles:[{role:'readWrite',db:'bookpath'}]});"
+
+# 2. redis password for compose (mode 600, gitignored — NEVER commit it)
+printf 'REDIS_PASSWORD=%s\n' '<REDIS_PW>' > /opt/bookpath/deploy/.env && chmod 600 /opt/bookpath/deploy/.env
+
+# 3. backend/.env
+MONGODB_URI=mongodb://bpapp:<APP_PW>@localhost:27017/bookpath?authSource=bookpath
+REDIS_PASSWORD=<REDIS_PW>
+
+# 4. apply — `up -d` recreates the containers and KEEPS the named volumes
+cd /opt/bookpath/deploy && docker compose up -d && pm2 restart bookpath-backend --update-env
+```
+
+Verify: `docker exec bookpath-redis redis-cli ping` → `NOAUTH`, and the app's
+`/health` says `redis: connected`. NEVER `docker compose down -v` (that deletes
+the volumes) and never rename the services/volumes (compose would create empty
+ones). Host-side `mongosh`/`redis-cli` diagnostics now need credentials:
+
+```bash
+PW=$(grep '^REDIS_PASSWORD=' /opt/bookpath/backend/.env | cut -d= -f2-)
+docker exec bookpath-redis redis-cli -a "$PW" --no-auth-warning --scan --pattern 'seo:v2:*' | wc -l
+```
+
 ## Ops cheat-sheet (on the VPS)
 
 ```bash
@@ -61,10 +95,14 @@ node /opt/bookpath/backend/scripts/refreshSeoCache.js        # warm SEO caches
 ## Scheduled maintenance (crontab on the VPS)
 
 ```cron
-0 5 * * *  cd /opt/bookpath/backend && node scripts/refreshSeoCache.js >> logs/seo-refresh.log 2>&1
+30 8 * * *  cd /opt/bookpath/backend && node scripts/refreshSeoCache.js --force >> logs/seo-refresh.log 2>&1
 0 8 * * 1  cd /opt/bookpath/backend && node scripts/kpiReport.js >> logs/kpi.log 2>&1
 */5 * * * * cd /opt/bookpath/backend && node scripts/healthCheck.js || curl -fsS <your-alert-webhook>
 ```
+
+The SEO warm runs at **08:30 UTC** on purpose: the Google Books quota resets at
+00:00 PT, which is 07:00 UTC in PDT but 08:00 UTC in PST — 08:30 is after the
+reset in both DST regimes.
 
 ## Domain note
 
