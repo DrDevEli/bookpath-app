@@ -14,15 +14,49 @@ import { fetchBooksForEntry } from "../services/seoBookFetcher.js";
 import { getGoogleBookById, searchGoogleBooks } from "../services/googleBooksService.js";
 import amazonAffiliateService from "../services/amazonAffiliateService.js";
 import { resolveMarket } from "../utils/marketResolver.js";
+import { normalizeChannel } from "../services/trackedLink.js";
 import AnalyticsEvent from "../models/AnalyticsEvent.js";
 import redis from "../config/redis.js";
 import logger from "../config/logger.js";
 
-function html(res, body, status = 200) {
+function html(res, body, status = 200, { privateCache = false } = {}) {
   res.status(status);
   res.set("Content-Type", "text/html; charset=utf-8");
-  res.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
+  // A page carrying Set-Cookie must never be stored by a shared cache, or the
+  // next visitor would be served someone else's channel cookie.
+  res.set(
+    "Cache-Control",
+    privateCache ? "private, max-age=600" : "public, max-age=3600, s-maxage=86400"
+  );
   res.send(body);
+}
+
+const CHANNEL_COOKIE = "bp_src";
+const CHANNEL_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Which acquisition channel brought this visitor, from the link they arrived on
+ * (?src= or ?utm_source=), remembered in a first-party cookie.
+ *
+ * The cookie is what keeps a visit attributable end to end: this HTML is cached
+ * by the browser, so the moment the reader moves to another list the channel
+ * would be lost and the eventual Amazon click would record as "direct" — the
+ * exact blindness this work exists to remove. A query param wins over the cookie
+ * so a new campaign can correct an earlier one.
+ */
+function channelFor(req, res) {
+  const fromQuery = normalizeChannel(req.query.src ?? req.query.utm_source);
+  const fromCookie = normalizeChannel(req.cookies?.[CHANNEL_COOKIE]);
+  if (fromQuery) {
+    res.cookie(CHANNEL_COOKIE, fromQuery, {
+      maxAge: CHANNEL_COOKIE_MAX_AGE,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+  }
+  return fromQuery || fromCookie || null;
 }
 
 // Top clicked book ids for the sitemap (bounded, cached — the sitemap is hit on
@@ -66,9 +100,15 @@ class SeoController {
       const entry = GENRE_BY_SLUG[req.params.slug];
       if (!entry) return res.status(404).send("Genre not found");
       const market = resolveMarket(req);
+      const src = channelFor(req, res);
       const books = await fetchBooksForEntry(entry, "genre");
       const linked = await amazonAffiliateService.addAffiliateLinksToBooks(books, market);
-      html(res, renderLandingPage({ type: "genre", entry, books: linked, market }));
+      html(
+        res,
+        renderLandingPage({ type: "genre", entry, books: linked, market, src }),
+        200,
+        { privateCache: Boolean(src) }
+      );
     } catch (err) {
       next(err);
     }
@@ -79,9 +119,15 @@ class SeoController {
       const entry = TOPIC_BY_SLUG[req.params.slug];
       if (!entry) return res.status(404).send("Topic not found");
       const market = resolveMarket(req);
+      const src = channelFor(req, res);
       const books = await fetchBooksForEntry(entry, "topic");
       const linked = await amazonAffiliateService.addAffiliateLinksToBooks(books, market);
-      html(res, renderLandingPage({ type: "topic", entry, books: linked, market }));
+      html(
+        res,
+        renderLandingPage({ type: "topic", entry, books: linked, market, src }),
+        200,
+        { privateCache: Boolean(src) }
+      );
     } catch (err) {
       next(err);
     }
@@ -92,9 +138,15 @@ class SeoController {
       const entry = AUTHOR_BY_SLUG[req.params.slug];
       if (!entry) return res.status(404).send("Author not found");
       const market = resolveMarket(req);
+      const src = channelFor(req, res);
       const books = await fetchBooksForEntry(entry, "author");
       const linked = await amazonAffiliateService.addAffiliateLinksToBooks(books, market);
-      html(res, renderLandingPage({ type: "author", entry, books: linked, market }));
+      html(
+        res,
+        renderLandingPage({ type: "author", entry, books: linked, market, src }),
+        200,
+        { privateCache: Boolean(src) }
+      );
     } catch (err) {
       next(err);
     }
@@ -175,7 +227,18 @@ class SeoController {
         market
       );
 
-      html(res, renderBookDetail({ book: linked || payload.book, related: payload.related || [], market }));
+      const src = channelFor(req, res);
+      html(
+        res,
+        renderBookDetail({
+          book: linked || payload.book,
+          related: payload.related || [],
+          market,
+          src,
+        }),
+        200,
+        { privateCache: Boolean(src) }
+      );
     } catch (err) {
       next(err);
     }

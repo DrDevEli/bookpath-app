@@ -13,6 +13,7 @@ import userRoutes from "./src/routes/userRoutes.js";
 import recommendationRoutes from "./src/routes/recommendationRoutes.js";
 import libraryRoutes from "./src/routes/libraryRoutes.js";
 import analyticsRoutes from "./src/routes/analyticsRoutes.js";
+import goRoutes from "./src/routes/goRoutes.js";
 import seoRoutes from "./src/routes/seoRoutes.js";
 import subscriberRoutes from "./src/routes/subscriberRoutes.js";
 import logger from "./src/config/logger.js";
@@ -132,6 +133,11 @@ app.use("/api/library", libraryRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/subscribers", subscriberRoutes);
+
+// Measured outbound redirect — every server-rendered Amazon CTA points here so
+// the click is attributable to a channel and a list. Mounted under /api/ so
+// nginx's existing proxy handles it (no nginx change required).
+app.use("/api/go", goRoutes);
 
 // SEO landing pages (server-rendered HTML at crawlable root paths)
 app.use("/", seoRoutes);

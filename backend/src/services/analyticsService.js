@@ -2,6 +2,47 @@ import AnalyticsEvent from "../models/AnalyticsEvent.js";
 import logger from "../config/logger.js";
 
 /**
+ * The set of `source` values the schema accepts. Mirrors the enum in
+ * models/AnalyticsEvent.js.
+ */
+const KNOWN_SOURCES = new Set([
+  "search",
+  "category",
+  "featured",
+  "book-details",
+  "recommendation",
+  "library",
+  "trending",
+  "instagram",
+  "pinterest",
+  "social",
+  "seo",
+  "email",
+  "link-hub",
+  "direct",
+]);
+
+/**
+ * Coerce an arbitrary source into something the schema will store.
+ *
+ * WHY: every write in this service is fire-and-forget, and `source` is an enum.
+ * A value the enum did not know (e.g. `?source=instagram` before Instagram was
+ * listed) made Mongoose reject the document, the rejection was swallowed by the
+ * .catch() below, and the event vanished — no error, no row, while the visitor
+ * was still redirected to Amazon. Silent loss is the worst possible failure
+ * mode for a measurement layer. An unknown source is therefore coerced to
+ * "direct" and logged loudly, so the click is always counted even when its
+ * label is wrong.
+ */
+export function normalizeSource(source, where = "unknown") {
+  const value = typeof source === "string" ? source.trim().toLowerCase() : "";
+  if (!value) return "direct";
+  if (KNOWN_SOURCES.has(value)) return value;
+  logger.warn("Analytics: unknown source coerced to direct", { source: value, where });
+  return "direct";
+}
+
+/**
  * AnalyticsService — records funnel events and computes affiliate KPIs.
  *
  * Event types:
@@ -19,7 +60,7 @@ class AnalyticsService {
     if (!source) return;
     AnalyticsEvent.create({
       type: "impression",
-      source,
+      source: normalizeSource(source, "impression"),
       context: context || null,
       resultCount,
       userId: userId || undefined,
@@ -49,7 +90,7 @@ class AnalyticsService {
     if (!bookId) return;
     AnalyticsEvent.create({
       type: "click",
-      source,
+      source: normalizeSource(source, "click"),
       context: context || null,
       bookId,
       bookTitle: bookTitle || null,

@@ -60,6 +60,30 @@ class AnalyticsController {
     }
   }
 
+  /**
+   * Public + rate-limited: records that a channel actually delivered a visitor
+   * onto an on-site surface (currently the /links hub).
+   *
+   * This is the missing denominator. Instagram owns "views"; only we can know
+   * how many of those views turned into an arrival on BookPath. Without it a
+   * post's performance is unfalsifiable.
+   */
+  static async visit(req, res, next) {
+    try {
+      const { source, context } = req.body || {};
+      analyticsService.recordImpression({
+        source,
+        context: context ? String(context).slice(0, 120) : null,
+        resultCount: 0,
+        userId: req.user?.id || null,
+        req,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async trending(req, res, next) {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit) || 8, 1), 50);

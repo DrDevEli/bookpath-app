@@ -20,6 +20,7 @@ import { BookSearch } from './components/BookSearch';
 import { Library } from './pages/Library';
 import { Analytics } from './pages/Analytics';
 import { About } from './pages/About';
+import { LinkHub } from './pages/LinkHub';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { AffiliateDisclosure } from './pages/AffiliateDisclosure';
@@ -75,6 +76,8 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/verify-email/:token" element={<VerifyEmail />} />
             <Route path="/about" element={<About />} />
+            {/* Bio-link destination for social traffic (see pages/LinkHub.tsx) */}
+            <Route path="/links" element={<LinkHub />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/affiliate-disclosure" element={<AffiliateDisclosure />} />

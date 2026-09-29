@@ -8,6 +8,7 @@ import {
   TOPIC_BY_SLUG,
   AUTHOR_BY_SLUG,
 } from "../data/seoCatalog.js";
+import { buildTrackedUrl } from "./trackedLink.js";
 
 /**
  * Server-side SEO landing-page renderer.
@@ -260,15 +261,47 @@ function relatedPages(entry, type, limit = 8) {
 // ---------------------------------------------------------------------------
 // Book card HTML
 // ---------------------------------------------------------------------------
-function bookCardHtml(book) {
+/**
+ * Route an outbound Amazon link through the measured redirect (/api/go).
+ *
+ * A raw `href="https://amazon.de/..."` is invisible to us: the reader leaves and
+ * we never learn the click happened. That is why every server-rendered CTA used
+ * to contribute exactly nothing to analytics — including all traffic from
+ * Instagram, Pinterest and Google, which is precisely the traffic whose value we
+ * are trying to judge. Signing the destination into our own redirect records the
+ * click with its channel and list before the reader is sent to Amazon.
+ *
+ * Falls back to the plain URL when signing is unavailable: a reader must always
+ * be able to reach the book. Measurement never gets to break the funnel.
+ */
+function trackedAmazonHref({ amazonUrl, source, context, book }) {
+  if (!amazonUrl) return null;
+  try {
+    return buildTrackedUrl({
+      url: amazonUrl,
+      source,
+      context,
+      bookId: book?.id || "",
+      bookTitle: book?.title || "",
+      coverImage: book?.coverImage ? httpsify(book.coverImage) : "",
+      authors: (book?.authors || []).filter(Boolean).join("; "),
+    });
+  } catch {
+    return amazonUrl;
+  }
+}
+
+function bookCardHtml(book, options = {}) {
+  const { src = null, context = null } = options;
   const cover = book.coverImage ? escapeHtml(httpsify(book.coverImage)) : "";
   const title = escapeHtml(book.title);
   const authors = (book.authors || []).map(escapeHtml).join(", ");
   const desc = book.description ? escapeHtml(book.description).slice(0, 240) : "";
   const year = book.firstPublishYear ? escapeHtml(book.firstPublishYear) : "";
 
-  const link = book.amazonLink
-    ? `<a class="amz" href="${escapeHtml(book.amazonLink)}" rel="nofollow sponsored noopener noreferrer" target="_blank">Check price on Amazon →</a>`
+  const amzHref = trackedAmazonHref({ amazonUrl: book.amazonLink, source: src, context, book });
+  const link = amzHref
+    ? `<a class="amz" href="${escapeHtml(amzHref)}" rel="nofollow sponsored noopener noreferrer" target="_blank">Check price on Amazon →</a>`
     : `<a class="detail" href="${bookDetailUrl(book.id)}">View details</a>`;
 
   // Real list price from Google Books saleInfo (present only for some books).
@@ -294,7 +327,7 @@ function bookCardHtml(book) {
 // ---------------------------------------------------------------------------
 // Full document render
 // ---------------------------------------------------------------------------
-export function renderLandingPage({ type, entry, books = [], market = "de" }) {
+export function renderLandingPage({ type, entry, books = [], market = "de", src = null }) {
   const { lang, category, intro, outro } = buildCopy(entry, type);
   const title = `${entry.name}${lang === "de" ? " — Empfehlungen & Bestseller" : " — Recommendations & Bestsellers"} | ${SITE_NAME}`;
   const desc =
@@ -304,7 +337,7 @@ export function renderLandingPage({ type, entry, books = [], market = "de" }) {
 
   const canonical = pageUrl(type, entry.slug);
   const related = relatedPages(entry, type);
-  const booksHtml = books.map(bookCardHtml).join("");
+  const booksHtml = books.map((b) => bookCardHtml(b, { src, context: entry.slug })).join("");
   const year = new Date().getFullYear();
 
   const structured = [
@@ -546,7 +579,7 @@ function truncateText(str, max = 155) {
  *
  * @param {{book: object, related?: object[], market?: string}} params
  */
-export function renderBookDetail({ book = {}, related = [], market = "de" }) {
+export function renderBookDetail({ book = {}, related = [], market = "de", src = null }) {
   const id = book.id || "";
   const title = book.title || "Book";
   const authors = (book.authors || []).filter(Boolean);
@@ -579,8 +612,14 @@ export function renderBookDetail({ book = {}, related = [], market = "de" }) {
       ? `<p class="price">${escapeHtml(currencySymbol(book.currencyCode))}${Number(book.price).toFixed(2)} <span>list price</span></p>`
       : "";
 
-  const cta = book.amazonLink
-    ? `<a class="cta" href="${escapeHtml(book.amazonLink)}" rel="nofollow sponsored noopener noreferrer" target="_blank">Check price on Amazon →</a>`
+  const detailAmzHref = trackedAmazonHref({
+    amazonUrl: book.amazonLink,
+    source: src,
+    context: "book-details",
+    book,
+  });
+  const cta = detailAmzHref
+    ? `<a class="cta" href="${escapeHtml(detailAmzHref)}" rel="nofollow sponsored noopener noreferrer" target="_blank">Check price on Amazon →</a>`
     : "";
   const searchCta = `<a class="cta alt" href="${SITE_URL}/search?q=${encodeURIComponent(title)}">Find similar books</a>`;
 

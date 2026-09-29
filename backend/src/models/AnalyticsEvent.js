@@ -19,7 +19,17 @@ const analyticsEventSchema = new mongoose.Schema(
       enum: ["impression", "click"],
       index: true,
     },
-    // Where the event originated (which surface the user was on)
+    // Where the event originated (which surface the user was on), and — for
+    // clicks that arrived through the tracked redirect (/api/go) — which
+    // acquisition channel delivered the visitor.
+    //
+    // KEEP THIS IN SYNC WITH services/trackedLink.js CHANNELS. It is an enum,
+    // and every write is fire-and-forget, so a value missing here used to make
+    // Mongoose reject the document and the event disappear with no error while
+    // the visitor was still redirected to Amazon. analyticsService.normalizeSource
+    // now coerces anything unknown to "direct" and logs it loudly, but the
+    // channels we actually use must still be listed here or their events lose
+    // their real source.
     source: {
       type: String,
       required: true,
@@ -31,6 +41,14 @@ const analyticsEventSchema = new mongoose.Schema(
         "recommendation",
         "library",
         "trending",
+        // Acquisition channels (set by the /api/go tracked redirect)
+        "instagram",
+        "pinterest",
+        "social",
+        "seo",
+        "email",
+        "link-hub",
+        "direct",
       ],
     },
     // The query string (search) or category name that led to the event.
