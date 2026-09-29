@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,6 +100,31 @@ export function BookSearch() {
   }, [isLoggedIn]);
 
   const watchedTitle = watch('title');
+
+  // The suggestion list is an absolutely-positioned overlay sitting on top of the
+  // rest of the form, so it has to be dismissible: before this, the only ways to
+  // close it were picking a suggestion or clearing the input, which left it
+  // covering the Category/Author controls below and swallowing their clicks.
+  const suggestBoxRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!showSuggestions) return;
+    // pointerdown (not click/blur): it fires before blur, so tapping a suggestion
+    // still registers, while a press anywhere outside dismisses the overlay.
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      if (suggestBoxRef.current && !suggestBoxRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSuggestions(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showSuggestions]);
 
   // Autocomplete: debounce partial-title input → fetch suggestions
   useEffect(() => {
@@ -295,7 +320,7 @@ export function BookSearch() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2 relative">
+            <div className="space-y-2 relative" ref={suggestBoxRef}>
               <Label htmlFor="title" className="text-text-primary">Book Title</Label>
               <Input
                 id="title"
@@ -306,7 +331,9 @@ export function BookSearch() {
                 className="bg-muted border-0 focus:ring-2 focus:ring-primary text-text-primary"
               />
               {showSuggestions && suggestions.length > 0 && (
-                <ul className="absolute z-20 w-full mt-1 max-h-64 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                /* Exactly 3 rows visible (3 x 52px + 2px border), the rest scroll.
+                   The old max-h-64 showed ~5 rows and covered the filters below. */
+                <ul className="absolute z-20 w-full mt-1 max-h-[158px] overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
                   {suggestions.map((s) => (
                     <li key={s.id}>
                       <button
@@ -316,7 +343,7 @@ export function BookSearch() {
                           if (s.authors?.length) setValue('author', s.authors[0]);
                           setShowSuggestions(false);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-3"
+                        className="w-full h-[52px] text-left px-3 text-sm hover:bg-gray-50 flex items-center gap-3"
                       >
                         {s.coverImage ? (
                           <img src={s.coverImage} alt="" className="w-6 h-9 object-cover rounded flex-shrink-0" />
