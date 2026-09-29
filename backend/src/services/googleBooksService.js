@@ -61,8 +61,12 @@ export async function searchGoogleBooks({ title, author, subject, q, page = 1 })
       // keywords like "best science fiction books")
       query = encodeURIComponent(q);
     } else if (subject) {
-      // Subject search - Google Books uses "subject:" prefix
-      query = `subject:${encodeURIComponent(subject)}`;
+      // Subject search — Google Books uses the `subject:` index qualifier. The
+      // value MUST be quoted (fixed 2026-09-29): unquoted, `subject:science
+      // fiction` is parsed as `subject:science` PLUS the free term `fiction`,
+      // which is how genre/science-fiction came to be filled with books ABOUT
+      // science fiction instead of science-fiction novels.
+      query = `subject:${encodeURIComponent(`"${subject}"`)}`;
     } else if (title && author) {
       query = `intitle:${encodeURIComponent(title)}+inauthor:${encodeURIComponent(author)}`;
     } else if (title) {

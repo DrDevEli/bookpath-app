@@ -9,6 +9,24 @@
  * normalized categories (Fiction, Sci-Fi, Fantasy, Mystery, Romance, History,
  * Biography, Self-Help, Business, Tech, Non-fiction) for internal linking and
  * breadcrumb/schema markup.
+ *
+ * `q` (optional, added 2026-09-29) is a RAW Google Books query that overrides
+ * `query` for every page type. Two reasons a page needs one:
+ *
+ *   1. GENRE pages send `subject:"<query>"`. A subject search answers with works
+ *      ABOUT the subject when the subject string is a phrase Google indexes that
+ *      way (`subject:"science fiction"` = criticism + bibliographies; self-help
+ *      and business were worse still — `subject:"self-help"` returned sociology
+ *      monographs about the self). Those pages now name the query they want.
+ *   2. TOPIC pages are named after editorial ideas ("best memoirs") that a
+ *      keyword search answers with books ABOUT the idea ("The 100 Best Business
+ *      Books of All Time"). `q` lets the page ask for the THING instead: an award
+ *      ("booker prize novel"), a canon imprint ("dover thrift editions"), or a
+ *      BISAC subject with a free term (`subject:"History" history` — a
+ *      qualifier-only query comes back empty intermittently, see seoBookFetcher).
+ *
+ * Every `q` in this file was chosen by probing the real pipeline (see
+ * marketing/catalog-quality/probe-subject.mjs) — never guessed.
  */
 
 export const SITE_URL = process.env.SITE_URL || "https://bookpath.org";
@@ -24,17 +42,17 @@ export const GENRES = [
   { slug: "romance", name: "Romance", query: "romance", category: "Romance", lang: "en" },
   { slug: "history", name: "History", query: "history", category: "History", lang: "en" },
   { slug: "biography", name: "Biography", query: "biography", category: "Biography", lang: "en" },
-  { slug: "self-help", name: "Self-Help", query: "self-help", category: "Self-Help", lang: "en" },
-  { slug: "business", name: "Business", query: "business", category: "Business", lang: "en" },
+  { slug: "self-help", name: "Self-Help", query: "self-help", q: "self-help book", category: "Self-Help", lang: "en" },
+  { slug: "business", name: "Business", query: "business", q: 'subject:"Business & Economics" business', category: "Business", lang: "en" },
   { slug: "technology", name: "Tech", query: "technology", category: "Tech", lang: "en" },
 ];
 
 export const TOPICS = [
   // ---- Fiction ----
   { slug: "best-fiction-books", name: "Best Fiction Books", query: "best fiction books", category: "Fiction", lang: "en" },
-  { slug: "best-novels-of-all-time", name: "Best Novels of All Time", query: "greatest novels", category: "Fiction", lang: "en" },
-  { slug: "classic-literature", name: "Classic Literature", query: "classic literature", category: "Fiction", lang: "en" },
-  { slug: "contemporary-fiction", name: "Contemporary Fiction", query: "contemporary fiction", category: "Fiction", lang: "en" },
+  { slug: "best-novels-of-all-time", name: "Best Novels of All Time", query: "greatest novels", q: "booker prize novel", category: "Fiction", lang: "en" },
+  { slug: "classic-literature", name: "Classic Literature", query: "classic literature", q: "dover thrift editions", category: "Fiction", lang: "en" },
+  { slug: "contemporary-fiction", name: "Contemporary Fiction", query: "contemporary fiction", q: "booker prize novel", category: "Fiction", lang: "en" },
   { slug: "historical-fiction", name: "Historical Fiction", query: "historical fiction", category: "Fiction", lang: "en" },
   { slug: "literary-fiction", name: "Literary Fiction", query: "literary fiction", category: "Fiction", lang: "en" },
   { slug: "short-story-collections", name: "Short Story Collections", query: "short stories", category: "Fiction", lang: "en" },
@@ -70,7 +88,7 @@ export const TOPICS = [
   { slug: "dragon-books", name: "Dragon Books", query: "dragon fantasy", category: "Fantasy", lang: "en" },
 
   // ---- Sci-Fi ----
-  { slug: "best-sci-fi-books", name: "Best Sci-Fi Books", query: "best science fiction books", category: "Sci-Fi", lang: "en" },
+  { slug: "best-sci-fi-books", name: "Best Sci-Fi Books", query: "best science fiction books", q: "asimov clarke heinlein science fiction", category: "Sci-Fi", lang: "en" },
   { slug: "hard-science-fiction", name: "Hard Science Fiction", query: "hard science fiction", category: "Sci-Fi", lang: "en" },
   { slug: "space-opera", name: "Space Opera", query: "space opera", category: "Sci-Fi", lang: "en" },
   { slug: "dystopian-books", name: "Dystopian Books", query: "dystopian", category: "Sci-Fi", lang: "en" },
@@ -83,7 +101,7 @@ export const TOPICS = [
   { slug: "ya-fantasy-books", name: "YA Fantasy Books", query: "young adult fantasy", category: "Fantasy", lang: "en" },
 
   // ---- History ----
-  { slug: "best-history-books", name: "Best History Books", query: "best history books", category: "History", lang: "en" },
+  { slug: "best-history-books", name: "Best History Books", query: "best history books", q: 'subject:"History" history', category: "History", lang: "en" },
   { slug: "world-war-2-books", name: "World War 2 Books", query: "world war 2", category: "History", lang: "en" },
   { slug: "ancient-history-books", name: "Ancient History Books", query: "ancient history", category: "History", lang: "en" },
   { slug: "medieval-history-books", name: "Medieval History Books", query: "medieval history", category: "History", lang: "en" },
@@ -93,13 +111,13 @@ export const TOPICS = [
 
   // ---- Biography ----
   { slug: "best-biographies", name: "Best Biographies", query: "best biographies", category: "Biography", lang: "en" },
-  { slug: "best-memoirs", name: "Best Memoirs", query: "memoir", category: "Biography", lang: "en" },
+  { slug: "best-memoirs", name: "Best Memoirs", query: "memoir", q: 'subject:"Biography & Autobiography" memoir', category: "Biography", lang: "en" },
   { slug: "celebrity-memoirs", name: "Celebrity Memoirs", query: "celebrity memoir", category: "Biography", lang: "en" },
   { slug: "musician-biographies", name: "Musician Biographies", query: "musician biography", category: "Biography", lang: "en" },
   { slug: "entrepreneur-biographies", name: "Entrepreneur Biographies", query: "entrepreneur biography", category: "Biography", lang: "en" },
 
   // ---- Self-Help ----
-  { slug: "best-self-help-books", name: "Best Self-Help Books", query: "best self help books", category: "Self-Help", lang: "en" },
+  { slug: "best-self-help-books", name: "Best Self-Help Books", query: "best self help books", q: 'subject:"Self-Help" habits', category: "Self-Help", lang: "en" },
   { slug: "personal-development-books", name: "Personal Development Books", query: "personal development", category: "Self-Help", lang: "en" },
   { slug: "productivity-books", name: "Productivity Books", query: "productivity", category: "Self-Help", lang: "en" },
   { slug: "mindfulness-books", name: "Mindfulness Books", query: "mindfulness", category: "Self-Help", lang: "en" },
@@ -110,7 +128,7 @@ export const TOPICS = [
   { slug: "leadership-books", name: "Leadership Books", query: "leadership", category: "Self-Help", lang: "en" },
 
   // ---- Business / Finance ----
-  { slug: "best-business-books", name: "Best Business Books", query: "best business books", category: "Business", lang: "en" },
+  { slug: "best-business-books", name: "Best Business Books", query: "best business books", q: "business strategy book", category: "Business", lang: "en" },
   { slug: "entrepreneurship-books", name: "Entrepreneurship Books", query: "entrepreneurship", category: "Business", lang: "en" },
   { slug: "investing-books", name: "Investing Books", query: "investing", category: "Business", lang: "en" },
   { slug: "personal-finance-books", name: "Personal Finance Books", query: "personal finance", category: "Business", lang: "en" },

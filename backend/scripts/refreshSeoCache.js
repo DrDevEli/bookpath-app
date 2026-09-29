@@ -14,6 +14,11 @@
  *   node scripts/refreshSeoCache.js --audit-only    # READ-ONLY: report cache health, no fetches
  *   node scripts/refreshSeoCache.js --genre         # genres only
  *   node scripts/refreshSeoCache.js --topic --limit=10
+ *   node scripts/refreshSeoCache.js --force --slugs=topic/best-memoirs,genre/science-fiction
+ *                                                   # rewrite ONLY those pages (a
+ *                                                   # catalog change usually affects a
+ *                                                   # handful; a full walk is ~40x the
+ *                                                   # quota for the same result)
  *
  * The cron entry uses --force: without it a page is served from cache and reported
  * as "populated" without being rewritten, so the entry keeps its old expiry and can
@@ -67,6 +72,7 @@ function parseArgs(argv) {
   let force = false;
   let coldOnly = false;
   let auditOnly = false;
+  let slugs = null;
   for (const a of argv) {
     if (a === "--genre") filterType = "genre";
     else if (a === "--topic") filterType = "topic";
@@ -74,9 +80,30 @@ function parseArgs(argv) {
     else if (a === "--force") force = true;
     else if (a === "--cold-only") coldOnly = true;
     else if (a === "--audit-only") auditOnly = true;
+    else if (a.startsWith("--slugs=")) slugs = a.slice("--slugs=".length).split(",").map((s) => s.trim()).filter(Boolean);
     else if (a.startsWith("--limit=")) limit = Number(a.split("=")[1]);
   }
-  return { filterType, limit, force, coldOnly, auditOnly };
+  return { filterType, limit, force, coldOnly, auditOnly, slugs };
+}
+
+/** Narrow a built list to the `--slugs=` selection. Labels are `type/slug`, so
+ *  `--slugs=topic/best-memoirs,genre/science-fiction` is unambiguous, and a bare
+ *  slug is accepted too (matched on the slug part) for convenience. An unknown
+ *  slug is a loud failure — silently warming nothing would look like success. */
+function filterBySlugs(items, slugs) {
+  if (!slugs) return items;
+  const wanted = new Set(slugs);
+  const picked = items.filter(({ entry, type }) =>
+    wanted.has(`${type}/${entry.slug}`) || wanted.has(entry.slug)
+  );
+  const found = new Set(picked.flatMap(({ entry, type }) => [`${type}/${entry.slug}`, entry.slug]));
+  const unknown = slugs.filter((s) => !found.has(s));
+  if (unknown.length) {
+    throw new Error(
+      `--slugs= names ${unknown.length} page(s) that are not in the catalog: ${unknown.join(", ")}`
+    );
+  }
+  return picked;
 }
 
 /**
@@ -151,9 +178,12 @@ function reportAudit(audit, { requireFresh = true } = {}) {
 }
 
 async function main() {
-  const { filterType, limit, force, coldOnly, auditOnly } = parseArgs(process.argv.slice(2));
-  let items = buildList(filterType).slice(0, limit);
+  const { filterType, limit, force, coldOnly, auditOnly, slugs } = parseArgs(process.argv.slice(2));
+  let items = filterBySlugs(buildList(filterType), slugs).slice(0, limit);
   const total = items.length;
+  if (slugs) {
+    console.log(`--slugs= scoped the walk to ${total} page(s): ${items.map(({ entry, type }) => `${type}/${entry.slug}`).join(", ")}`);
+  }
 
   if (auditOnly) {
     console.log(`Read-only cache audit of ${total} catalog pages (no Google Books requests).`);

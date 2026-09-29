@@ -127,9 +127,66 @@ const TRADE_PUBLISHER = new RegExp(
     "campus verlag", "redline", "finanzbuch", "\\becon\\b", "beck", "scherz", "blanvalet",
     "oreilly", "o'reilly", "apress", "no starch", "packt", "manning", "pragmatic",
     "thomas & mercer", "lake union", "montlake", "47north", "brilliance", "amazoncrossing",
+    // Added 2026-09-29 — trade imprints that were being treated as no-name
+    // publishers while independent/quotation-grade houses scored above them.
+    "picador", "virago", "secker", "jonathan cape", "farrar", "straus", "\\bgiroux\\b",
+    "henry holt", "riverhead", "\\bputnam\\b", "\\bgrove\\b", "atlantic monthly",
+    "graywolf", "houghton mifflin", "mariner books", "back bay", "anchor books",
+    "\\bcanongate\\b", "\\bserpent'?s tail\\b", "\\bsoho press\\b", "\\bceladon\\b",
+    "\\briverrun\\b", "\\bdial press\\b", "\\beuropa editions\\b", "\\bharvill\\b",
+    "\\b4th estate\\b", "\\bfourth estate\\b", "\\btinder press\\b", "\\bpamela dorman\\b",
+    "\\bblack swan\\b", "\\bcornerstone\\b", "\\bwindmill books\\b",
+    // Canon imprints that ARE the product on the classics pages (Dover Thrift,
+    // Wordsworth, Signet and Bantam Classics are what a buyer searches for).
+    "\\bdover\\b", "courier dover", "wordsworth editions", "\\bsignet\\b", "bantam classics",
   ].join("|"),
   "i"
 );
+
+/**
+ * Categories that mean "a book ABOUT books" rather than a book to read.
+ *
+ * Measured on the live cache 2026-09-29 (1,592 volumes, 87.6% carrying a BISAC
+ * `categories` array — free metadata the ranker previously ignored): every
+ * off-topic survivor on the eight broken pages carried one of these as its ONLY
+ * category, e.g. `Critical Terms for Science Fiction and Fantasy` (Literary
+ * Criticism) on genre/science-fiction, `The Digital Reader` (Education) on
+ * topic/classic-literature, `Research Methods for Business Students` (Business
+ * & Economics is NOT here — it is the page's own domain) — see the note below.
+ *
+ * What it is not: a way to catch a book that is *about* the page's subject but
+ * legitimately categorized inside it (`The 100 Best Business Books of All Time`
+ * is Business & Economics). That class is a QUERY problem, fixed in the catalog.
+ */
+const OFF_TOPIC_CATEGORY = new RegExp(
+  [
+    "literary criticism", "\\breference\\b", "language arts & disciplines",
+    "study aids", "\\beducation\\b", "bibliograph", "library science",
+    "\\bbooks\\b", "antiques & collectibles", "publishing", "journalism",
+  ].join("|"),
+  "i"
+);
+
+/**
+ * Page category -> the BISAC category a real book in that section carries.
+ * A match is worth CATEGORY_BONUS: it is the cheapest available proof that the
+ * volume belongs on THIS page rather than merely mentioning its topic.
+ * Keys are lowercased `entry.category` values from seoCatalog.js.
+ */
+const CATEGORY_MATCH = {
+  fiction: /^(fiction|juvenile fiction|young adult fiction)/i,
+  "non-fiction": /^(?!fiction)/i, // everything that is not fiction — deliberately permissive
+  "sci-fi": /^(science fiction|fiction|juvenile fiction)/i,
+  fantasy: /^(fantasy|fiction|juvenile fiction)/i,
+  mystery: /^(mystery|detective|fiction|thriller)/i,
+  romance: /^(romance|fiction)/i,
+  history: /^history/i,
+  biography: /^(biography|autobiography)/i,
+  "self-help": /^(self-help|self help|body, mind)/i,
+  business: /^business/i,
+  tech: /^(computers|technology|computers & internet)/i,
+};
+const CATEGORY_BONUS = 5;
 
 /** A Google bulk-scan dump has no publisher and an old (or absent) year. This is
  *  the single highest-yield filter: it removes the entire `best-memoirs`
@@ -174,6 +231,35 @@ export function publisherRejectReason(book) {
   return m ? `junk-publisher:${m[0].toLowerCase()}` : null;
 }
 
+/** Categories (BISAC strings Google returns in `volumeInfo.categories`) that
+ *  carry no value on any BookPath page. Silently absent categories are NOT a
+ *  reason: 12.4% of served volumes carry none, and rejecting those would starve
+ *  whole lists (same reasoning as the ratingsCount gate that was measured and
+ *  rejected). Only a volume whose EVERY category is off-topic is dropped. */
+export function categoryRejectReason(book, entry = {}, opts = {}) {
+  // An AUTHOR page is about a person, not a section: "How to Become a Straight-A
+  // Student" (Study Aids) is a real Cal Newport book and belongs on his page.
+  if (opts.isAuthorPage) return null;
+  const cats = (Array.isArray(book?.genres) ? book.genres : []).filter(Boolean).map(String);
+  if (cats.length === 0) return null;
+  // Google labels ebooks "Electronic books"; that says nothing about the content.
+  if (cats.some((c) => /^electronic books?$/i.test(c))) return null;
+  // A page whose own subject IS one of these (none today, but the catalog is
+  // data) must not reject its own domain.
+  const pageCat = String(entry.category || "").toLowerCase();
+  if (pageCat && OFF_TOPIC_CATEGORY.test(pageCat)) return null;
+  if (!cats.every((c) => OFF_TOPIC_CATEGORY.test(c))) return null;
+  return `off-topic-category:${cats[0].toLowerCase()}`;
+}
+
+/** Bonus when the volume's own BISAC category matches the page's section. */
+export function categoryMatchBonus(book, entry = {}) {
+  const want = CATEGORY_MATCH[String(entry?.category || "").toLowerCase()];
+  if (!want) return 0;
+  const cats = Array.isArray(book?.genres) ? book.genres : [];
+  return cats.some((c) => want.test(String(c))) ? CATEGORY_BONUS : 0;
+}
+
 /**
  * Hard reject, in priority order. Returns a short reason string or null.
  * `entry.lang` ("en" | "de") is the landing page's language; a page in English
@@ -193,6 +279,11 @@ export function rejectReason(book, entry = {}, opts = {}) {
 
   const p = publisherRejectReason(book);
   if (p) return p;
+
+  // "A book about books" — see OFF_TOPIC_CATEGORY. Sits with the title and
+  // publisher rules because it is structural, not a matter of taste.
+  const c = categoryRejectReason(book, entry, opts);
+  if (c) return c;
 
   const pages = Number(book.pageCount) || 0;
   if (pages && (pages < MIN_PAGES || pages > MAX_PAGES)) return "page-count";
@@ -230,22 +321,28 @@ const SOFT_REASONS = new Set(["language"]);
  * Score a book that passed the hard filters. Higher is better. Every signal here
  * is free — it is already in the payload of the request that produced the book.
  */
-export function scoreBook(book) {
+export function scoreBook(book, entry = {}) {
   let score = 0;
 
   const rc = Number(book.ratingsCount) || 0;
   const ar = Number(book.averageRating) || 0;
   // Reader ratings only exist for books people actually read. Sparse in Google
-  // Books (7.1% of the served set) — hence a bonus, never a gate.
-  if (rc > 0) score += 2 + Math.min(8, Math.log10(rc + 1) * 4);
+  // Books (7.1% of the served set) — hence a bonus, never a gate. Raised
+  // 2026-09-29 (was 2 + min(8, ·)): on the eight broken pages the ONLY clear
+  // winners in every probe were the volumes carrying ratingsCount, so the one
+  // honest "people read this" signal available should dominate the tie-breaks.
+  if (rc > 0) score += 3 + Math.min(12, Math.log10(rc + 1) * 5);
   if (ar >= 4.2) score += 3;
   else if (ar >= 3.8) score += 2;
   else if (ar >= 3.4) score += 1;
 
+  // Does the volume's own category match the page's section?
+  score += categoryMatchBonus(book, entry);
+
   const pub = book.publisher || "";
   if (pub && TRADE_PUBLISHER.test(pub)) score += 6;
   if (pub && ACADEMIC_PUBLISHER.test(pub)) score -= 4;
-  if (pub && /independently published|self-?published/i.test(pub)) score -= 2;
+  if (pub && /independently published|self-?published/i.test(pub)) score -= 4;
 
   // A real ISBN means a modern, trade-distributed book (§ the scan dumps rarely
   // carry one).
@@ -293,7 +390,7 @@ function dedupeKey(book) {
  * @returns {{selected: Array, stats: object}}
  */
 export function rankBooks(books, opts = {}) {
-  const { entry = {}, limit = 12, maxPerAuthor = 2, strictLanguage = true } = opts;
+  const { entry = {}, limit = 12, maxPerAuthor = 2, strictLanguage = true, isAuthorPage = false } = opts;
   const stats = {
     considered: books.length,
     rejected: {},
@@ -309,7 +406,7 @@ export function rankBooks(books, opts = {}) {
   const seen = new Set();
 
   const score = (book) => {
-    let s = scoreBook(book);
+    let s = scoreBook(book, entry);
     // On an author page a language mismatch is allowed but still disfavoured.
     if (!strictLanguage && entry.lang && String(book.language || "").startsWith(entry.lang)) {
       s += LANG_BONUS;
@@ -318,7 +415,7 @@ export function rankBooks(books, opts = {}) {
   };
 
   for (const book of books || []) {
-    const reason = rejectReason(book, entry, { strictLanguage });
+    const reason = rejectReason(book, entry, { strictLanguage, isAuthorPage });
     if (reason) {
       stats.rejected[reason] = (stats.rejected[reason] || 0) + 1;
       if (SOFT_REASONS.has(reason)) relaxed.push({ book, score: score(book) - 5 });
@@ -388,6 +485,7 @@ export function selectionOptionsFor(entry, type, limit = DEFAULT_LIMIT) {
   return {
     entry,
     limit,
+    isAuthorPage,
     // An author page IS one author, so the diversity cap would truncate it to 2
     // books (measured on `author/john-grisham`). The cap exists to stop one
     // prolific self-publisher owning a whole TOPIC list (`topic/cozy-mysteries`
@@ -400,4 +498,4 @@ export function selectionOptionsFor(entry, type, limit = DEFAULT_LIMIT) {
   };
 }
 
-export default { rankBooks, scoreBook, rejectReason, selectionOptionsFor, DEFAULT_LIMIT };
+export default { rankBooks, scoreBook, rejectReason, categoryRejectReason, categoryMatchBonus, selectionOptionsFor, DEFAULT_LIMIT };

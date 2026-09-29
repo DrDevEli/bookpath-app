@@ -100,7 +100,18 @@ async function searchWithBackoff(params, label) {
   throw lastErr;
 }
 
+/**
+ * The Google Books request parameters for a catalog entry.
+ *
+ * `entry.q`, when present, is a RAW query and wins for every page type. It exists
+ * because a genre page is otherwise locked to a `subject:` search, and some
+ * genre subjects are unanswerable that way: `subject:"science fiction"` returns
+ * books ABOUT science fiction (criticism, bibliographies, anthologies of essays)
+ * rather than SF novels. The same page with an explicit `q` can ask for the
+ * novels directly. Every catalog entry supplies either `q` or `query`.
+ */
 export function searchParamsForEntry(entry, type, page = 1) {
+  if (entry.q) return { q: entry.q, page };
   if (type === "genre") return { subject: entry.query, page };
   if (type === "author") return { author: entry.query, page };
   return { q: entry.query, page };
@@ -163,6 +174,7 @@ export async function fetchBooksForEntry(entry, type, options = {}) {
     // Widen the candidate pool until the ranker can fill a shelf (or we run out
     // of pages). Ranking runs over ALL candidates seen so far, so a good book on
     // page 3 outranks a mediocre one on page 1.
+    let retriedEmptyFirstPage = false;
     for (let page = 1; page <= MAX_CANDIDATE_PAGES; page++) {
       await paceRequests();
       const batch = await searchWithBackoff(
@@ -170,7 +182,26 @@ export async function fetchBooksForEntry(entry, type, options = {}) {
         `${type}/${entry.slug} p${page}`
       );
       requests++;
-      if (!batch || batch.length === 0) break;
+      if (!batch || batch.length === 0) {
+        // A query the API answers from its qualifier index intermittently comes
+        // back EMPTY: measured 2026-09-29, the byte-identical request returned 0
+        // items and then 300 items seconds apart (while the raw HTTP call in
+        // between answered 200/300). One delayed retry of page 1 converts that
+        // transient blank into a page that still fills, for one extra request.
+        // Deeper pages are NOT retried — an empty page 2 really is the end of
+        // the result set, and retrying it would burn quota for nothing.
+        if (page === 1 && !retriedEmptyFirstPage) {
+          retriedEmptyFirstPage = true;
+          logger.warn("Google Books returned an empty FIRST page — retrying once", {
+            type,
+            slug: entry.slug,
+          });
+          await new Promise((r) => setTimeout(r, 2000));
+          page = 0; // the loop's ++ makes this page 1 again
+          continue;
+        }
+        break;
+      }
       candidates.push(...batch);
       ranked = rankBooks(candidates, selection);
       if (ranked.selected.length >= MAX_BOOKS) break;
