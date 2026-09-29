@@ -106,6 +106,11 @@ export function BookSearch() {
   // close it were picking a suggestion or clearing the input, which left it
   // covering the Category/Author controls below and swallowing their clicks.
   const suggestBoxRef = useRef<HTMLDivElement | null>(null);
+  // The title that was just set by picking a suggestion. Without this the
+  // autocomplete effect below fires on that programmatic change, re-fetches, and
+  // forces the list back OPEN — so the dropdown reappeared immediately after the
+  // user had dismissed it by choosing a row, still covering Category/Author.
+  const pickedTitleRef = useRef<string>('');
   useEffect(() => {
     if (!showSuggestions) return;
     // pointerdown (not click/blur): it fires before blur, so tapping a suggestion
@@ -129,7 +134,7 @@ export function BookSearch() {
   // Autocomplete: debounce partial-title input → fetch suggestions
   useEffect(() => {
     const q = (watchedTitle || '').trim();
-    if (q.length < 2) {
+    if (q.length < 2 || q === pickedTitleRef.current) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -339,8 +344,10 @@ export function BookSearch() {
                       <button
                         type="button"
                         onClick={() => {
+                          pickedTitleRef.current = s.title;
                           setValue('title', s.title);
                           if (s.authors?.length) setValue('author', s.authors[0]);
+                          setSuggestions([]);
                           setShowSuggestions(false);
                         }}
                         className="w-full h-[52px] text-left px-3 text-sm hover:bg-gray-50 flex items-center gap-3"
