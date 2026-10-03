@@ -5,6 +5,7 @@ import { getGoogleBookById, searchGoogleBooks } from "../services/googleBooksSer
 import amazonAffiliateService from "../services/amazonAffiliateService.js";
 import featuredBooksService from "../services/featuredBooksService.js";
 import analyticsService from "../services/analyticsService.js";
+import { isBotRequest } from "../utils/botDetect.js";
 import { ApiError } from "../utils/errors.js";
 import { resolveMarket } from "../utils/marketResolver.js";
 import redis from "../config/redis.js";
@@ -541,6 +542,7 @@ class BookController {
       // `source`/`context` are threaded from the frontend so CTR can be computed
       // per search query and per category.
       const { source = "book-details", context, variant } = req.query;
+      const bot = isBotRequest(req);
       analyticsService.recordClick({
         source,
         context: context || null,
@@ -552,6 +554,9 @@ class BookController {
         variant: variant || null,
         market,
         userId: req.user?.id || null,
+        // Same crawler marking as /api/go: this route is clickable from a crawlable
+        // link too, and a crawler click must never look like a reader in Trending.
+        isBot: bot.isBot,
         req,
       });
 
@@ -561,6 +566,7 @@ class BookController {
         source,
         context: context || null,
         market,
+        isBot: bot.isBot,
         timestamp: new Date().toISOString()
       });
 

@@ -23,6 +23,21 @@ const KNOWN_SOURCES = new Set([
 ]);
 
 /**
+ * Excludes crawler/script events from every metric that claims to describe READERS.
+ *
+ * `$ne: true` rather than `false` on purpose: rows written before 2026-10-02 have no
+ * `isBot` field at all, and they must keep counting. The backfill marks the KNOWN
+ * crawler rows true; anything unmarked is presumed human. Fail open — the same
+ * reasoning as normalizeSource below.
+ *
+ * Why this is needed: /api/go is a real href in SSR landing pages, so link-following
+ * crawlers hit it exactly like a reader does. Measured 2026-10-02: 1,873 of 1,896 click
+ * rows were meta-externalagent (Meta's crawler), and those bogus clicks were driving
+ * the PUBLIC "Trending" carousel on the homepage.
+ */
+const HUMANS_ONLY = { isBot: { $ne: true } };
+
+/**
  * Coerce an arbitrary source into something the schema will store.
  *
  * WHY: every write in this service is fire-and-forget, and `source` is an enum.
@@ -56,13 +71,14 @@ class AnalyticsService {
   /**
    * Record an impression event. Fire-and-forget — never throws.
    */
-  recordImpression({ source, context, resultCount = 0, userId = null, req = null }) {
+  recordImpression({ source, context, resultCount = 0, userId = null, req = null, isBot = false }) {
     if (!source) return;
     AnalyticsEvent.create({
       type: "impression",
       source: normalizeSource(source, "impression"),
       context: context || null,
       resultCount,
+      isBot: Boolean(isBot),
       userId: userId || undefined,
       ipAddress: req?.ip,
       userAgent: req?.headers?.["user-agent"],
@@ -73,6 +89,10 @@ class AnalyticsService {
 
   /**
    * Record a click event. Fire-and-forget — never throws.
+   *
+   * `isBot` marks a crawler/script hit. The row is still written (the volume is worth
+   * seeing) but is excluded from reader metrics. The caller classifies; see
+   * utils/botDetect.js.
    */
   recordClick({
     source,
@@ -86,6 +106,7 @@ class AnalyticsService {
     market = "de",
     userId = null,
     req = null,
+    isBot = false,
   }) {
     if (!bookId) return;
     AnalyticsEvent.create({
@@ -99,6 +120,7 @@ class AnalyticsService {
       amazonUrl: amazonUrl || null,
       variant: variant || null,
       market: market === "us" ? "us" : "de",
+      isBot: Boolean(isBot),
       userId: userId || undefined,
       ipAddress: req?.ip,
       userAgent: req?.headers?.["user-agent"],
@@ -119,21 +141,21 @@ class AnalyticsService {
 
     const [clicksTotal, clicksToday, clicks7d, clicks30d, impTotal, impToday, imp7d, imp30d, bySource, uniqueBooks] =
       await Promise.all([
-        this._count({ type: "click" }),
-        this._count({ type: "click", since: startOfToday }),
-        this._count({ type: "click", since: last7d }),
-        this._count({ type: "click", since: last30d }),
+        this._count({ type: "click", excludeBots: true }),
+        this._count({ type: "click", since: startOfToday, excludeBots: true }),
+        this._count({ type: "click", since: last7d, excludeBots: true }),
+        this._count({ type: "click", since: last30d, excludeBots: true }),
         this._count({ type: "impression" }),
         this._count({ type: "impression", since: startOfToday }),
         this._count({ type: "impression", since: last7d }),
         this._count({ type: "impression", since: last30d }),
         AnalyticsEvent.aggregate([
-          { $match: { type: "click" } },
+          { $match: { ...HUMANS_ONLY, type: "click" } },
           { $group: { _id: "$source", count: { $sum: 1 } } },
           { $sort: { count: -1 } },
         ]),
         AnalyticsEvent.aggregate([
-          { $match: { type: "click" } },
+          { $match: { ...HUMANS_ONLY, type: "click" } },
           { $group: { _id: null, uniqueBooks: { $addToSet: "$bookId" } } },
           { $project: { uniqueBooks: { $size: "$uniqueBooks" } } },
         ]),
@@ -147,9 +169,10 @@ class AnalyticsService {
     };
   }
 
-  async _count({ type, since = null } = {}) {
+  async _count({ type, since = null, excludeBots = false } = {}) {
     const match = { type };
     if (since) match.timestamp = { $gte: since };
+    if (excludeBots) match.isBot = { $ne: true };
     const rows = await AnalyticsEvent.aggregate([
       { $match: match },
       { $count: "count" },
@@ -163,7 +186,7 @@ class AnalyticsService {
   async getTopBooks({ days = 30, limit = 10 } = {}) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     return AnalyticsEvent.aggregate([
-      { $match: { type: "click", timestamp: { $gte: cutoff } } },
+      { $match: { ...HUMANS_ONLY, type: "click", timestamp: { $gte: cutoff } } },
       { $sort: { timestamp: -1 } },
       {
         $group: {
@@ -189,6 +212,7 @@ class AnalyticsService {
     return AnalyticsEvent.aggregate([
       {
         $match: {
+          ...HUMANS_ONLY,
           type: { $in: ["click", "impression"] },
           context: { $exists: true, $ne: null, $ne: "" },
           timestamp: { $gte: cutoff },
@@ -225,7 +249,7 @@ class AnalyticsService {
   async getDailyClicks({ days = 14 } = {}) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     return AnalyticsEvent.aggregate([
-      { $match: { type: "click", timestamp: { $gte: cutoff } } },
+      { $match: { ...HUMANS_ONLY, type: "click", timestamp: { $gte: cutoff } } },
       {
         $group: {
           _id: {
@@ -244,7 +268,7 @@ class AnalyticsService {
   async getClicksByVariant({ days = 30 } = {}) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     return AnalyticsEvent.aggregate([
-      { $match: { type: "click", timestamp: { $gte: cutoff } } },
+      { $match: { ...HUMANS_ONLY, type: "click", timestamp: { $gte: cutoff } } },
       { $group: { _id: { $ifNull: ["$variant", "unset"] }, clicks: { $sum: 1 } } },
       { $sort: { clicks: -1 } },
     ]);
@@ -253,10 +277,15 @@ class AnalyticsService {
   /**
    * Public "trending" — most-clicked books with enough metadata to render a
    * card. Used by the Home page's top-converting section.
+   *
+   * THIS IS A PUBLIC SURFACE, so crawler filtering matters most here: unfiltered, the
+   * homepage carousel promoted exactly the junk the catalog ranker exists to remove
+   * ("What Do I Read Next? 1995", "Application Management", ...) because a crawler
+   * walked the landing-page CTAs.
    */
   async getTrending({ limit = 8 } = {}) {
     return AnalyticsEvent.aggregate([
-      { $match: { type: "click", bookTitle: { $exists: true, $ne: null } } },
+      { $match: { ...HUMANS_ONLY, type: "click", bookTitle: { $exists: true, $ne: null } } },
       { $sort: { timestamp: -1 } },
       {
         $group: {

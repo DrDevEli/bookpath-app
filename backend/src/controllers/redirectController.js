@@ -1,5 +1,6 @@
 import { verifyTracked, resolveChannel, marketForDestination } from "../services/trackedLink.js";
 import analyticsService from "../services/analyticsService.js";
+import { isBotRequest } from "../utils/botDetect.js";
 import logger from "../config/logger.js";
 
 /**
@@ -36,6 +37,12 @@ class RedirectController {
       referrer: req.get("referer"),
     });
 
+    // This endpoint is a real href in server-rendered pages, so link-following crawlers
+    // hit it exactly like a reader. Classify the UA and MARK the row rather than
+    // counting it as a reader — the redirect itself still happens either way, because
+    // the funnel must never break for a real user.
+    const bot = isBotRequest(req);
+
     analyticsService.recordClick({
       source,
       context: verified.context || null,
@@ -46,6 +53,7 @@ class RedirectController {
       amazonUrl: verified.url,
       market: marketForDestination(verified.url),
       userId: req.user?.id || null,
+      isBot: bot.isBot,
       req,
     });
 
@@ -54,6 +62,8 @@ class RedirectController {
       context: verified.context || null,
       bookId: verified.bookId || null,
       market: marketForDestination(verified.url),
+      isBot: bot.isBot,
+      botReason: bot.reason,
     });
 
     // The redirect itself must never be cached or indexed.

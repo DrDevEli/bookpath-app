@@ -76,6 +76,16 @@ const analyticsEventSchema = new mongoose.Schema(
     // Impression-only field: how many books were shown
     resultCount: { type: Number, min: 0 },
 
+    // True when the event came from a crawler/script rather than a reader.
+    //
+    // WHY: /api/go is a real href in SSR landing pages, so link-following crawlers
+    // (measured: meta-externalagent, 1,873 rows) hit it exactly like a human would.
+    // Such rows are still WRITTEN — the volume is worth seeing — but every metric that
+    // claims to describe readers (getTrending/getOverview/getTopBooks/getDailyClicks)
+    // filters them out with { isBot: { $ne: true } }, so pre-existing rows without the
+    // field keep counting. Never delete these rows; a marker keeps history auditable.
+    isBot: { type: Boolean, default: false, index: true },
+
     // Optional attribution
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     ipAddress: { type: String },

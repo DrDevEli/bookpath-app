@@ -783,6 +783,13 @@ ${urls.join("\n")}${bookEntries ? `\n${bookEntries}` : ""}
 export function renderRobotsTxt() {
   return `User-agent: *
 Allow: /
+# Keep crawlers out of the JSON and redirect endpoints. /api/go is a real href in the
+# server-rendered landing pages, so link-following crawlers walked all 12 CTAs of every
+# page and each fetch was recorded as an affiliate click: measured 2026-10-02, 1,873 of
+# 1,896 click rows were meta-externalagent (AS32934 Facebook) and ZERO were readers —
+# which also fed bogus books into the public "Trending" carousel. There is nothing to
+# index under /api/, so disallow the whole prefix rather than just the redirect.
+Disallow: /api/
 
 Sitemap: ${SITE_URL}/sitemap.xml
 `;
