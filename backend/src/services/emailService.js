@@ -163,24 +163,30 @@ async function sendPasswordResetEmail(email, token, username) {
 }
 
 /**
- *  Send a welcome email after a user subscribes to the deals/reactivation list.
+ *  Send a welcome email after a user subscribes to the lists/recommendation list.
  *  Non-critical: callers should fire-and-forget and tolerate failure (no-op
  *  when SMTP is unconfigured — the mock transporter logs instead of sending).
+ *
+ *  COPY RULE (2026-10-08): this email must not promise "deals" or prices. The
+ *  catalog has no price data until Amazon approves the PA-API, so a deals promise
+ *  is a claim the product cannot keep. The copy used to say "good book deals";
+ *  it now mirrors the /links capture card, which promises one email per new list.
  */
 async function sendWelcomeEmail(email) {
   const html = `
     <div style="font-family:Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2937">
       <h2 style="margin:0 0 12px">Welcome to BookPath 📚</h2>
-      <p>You're on the list. We'll email you when we spot genuinely good book
-         deals and recommendations in the genres you care about.</p>
-      <p>No spam, ever — just curated finds worth your time. You can unsubscribe
-         with one click on any email.</p>
+      <p>You're on the list. We'll email you when a new list goes up — and when we
+         find books genuinely worth your time.</p>
+      <p>Short emails only, no filler, and no newsletters you didn't ask for. You
+         can unsubscribe in one click from any of them.</p>
       <p style="color:#6b7280;font-size:13px">— The BookPath team</p>
     </div>
   `;
   const text =
-    "Welcome to BookPath! You're on the list — we'll email you curated book deals " +
-    "and recommendations in the genres you care about. No spam, ever.";
+    "Welcome to BookPath! You're on the list — we'll email you when a new list " +
+    "goes up, and when we find books genuinely worth your time. Short emails only, " +
+    "no filler. Unsubscribe in one click from any email.";
 
   return sendEmail({
     to: email,
