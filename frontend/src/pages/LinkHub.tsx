@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CURATED_PATHS, REBUILD_NOTE, TOTAL_CURATED } from '../lib/curatedLists';
+import { SubscribeCard } from '../components/SubscribeCard';
 
 /**
  * /links — the hub the Instagram bio (and Story sticker) points at.
@@ -106,6 +107,10 @@ export function LinkHub() {
         <h2 className="text-lg font-semibold">What is not here yet</h2>
         <p className="text-sm text-muted-foreground">{REBUILD_NOTE}</p>
       </section>
+
+      {/* Capture AFTER the lists: the hub's job is to route to a list in one tap,
+          so a form above them would compete with the primary path. */}
+      <SubscribeCard source={channel} context="link-hub" />
 
       <section className="rounded-lg border p-5 space-y-2">
         <h2 className="text-lg font-semibold">Looking for something specific?</h2>
